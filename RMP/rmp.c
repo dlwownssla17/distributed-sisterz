@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "protocol.h"
 #include "rmp.h"
 
 
@@ -53,13 +55,9 @@ int RMP_createSocket(rmp_address *address)
 int RMP_sendTo(int socket_fd, rmp_address *destination,
                const void *buffer, int num_bytes)
 {
-	int num_bytes_sent = sendto(socket_fd, buffer, num_bytes, 0, 
-	                            (struct sockaddr *) destination,
-	                            sizeof(rmp_address));
-	if(num_bytes_sent == -1) {
-		perror(NULL);
-	}
-
+	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
+	                                       DATA, random(),
+               		 					   buffer, num_bytes);
 	return num_bytes_sent;
 }
 
@@ -68,22 +66,21 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 int RMP_listen(int socket_fd, void *buffer, size_t len,
                rmp_address *src_address)
 {
-	socklen_t *address_len_pointer;
-	if(src_address == NULL) {
-		address_len_pointer = NULL;
-	} else {
-		socklen_t address_len = sizeof(rmp_address);
-		address_len_pointer = &address_len;
+	// Receive a message
+	struct sockaddr_in internal_src_address;
+	enum message_type type;
+	long int message_id;
+	int num_bytes_received = receive_rmp_datagram(socket_fd, &internal_src_address,
+	                                              &type, &message_id,
+	                                              buffer, len);
+    if(num_bytes_received == -1) {
+        return -1;
+    }
+    if(src_address != NULL) {
+		memcpy(src_address, &internal_src_address, sizeof(rmp_address));
 	}
 
-    int bytes_received = recvfrom(socket_fd, buffer, len - 1, 0,
-                                  (struct sockaddr *) src_address,
-                                  address_len_pointer);
-    if(bytes_received == -1) {
-        perror(NULL);
-    }
-
-    return bytes_received;
+    return num_bytes_received;
 }
 
 
