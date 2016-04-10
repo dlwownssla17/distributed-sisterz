@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "test_constants.h"
 #include "../rmp.h"
 
@@ -23,9 +24,10 @@ int main()
 	rmp_address src_address;
 	int num_bytes_received = RMP_listen(my_socket, buffer, buffer_size, &src_address);
 	assert(num_bytes_received == sizeof(MESSAGE), "RMP_listen didn't return the expected number of bytes");
+	assert(strncmp(buffer, MESSAGE, sizeof(MESSAGE)) == 0, "RMP_listen didn't get the right message.");
 
 	int bytes_sent = RMP_sendTo(my_socket, &src_address, MESSAGE2, sizeof(MESSAGE2));
-	assert(bytes_sent = sizeof(MESSAGE2), "RMP_sendTo sent too few bytes");
+	assert(bytes_sent == sizeof(MESSAGE2), "RMP_sendTo sent the wrong number of bytes");
 
 	RMP_closeSocket(my_socket);
 

@@ -19,6 +19,7 @@ clean:
 	rm -f librmp.a *.o tests/*.o
 
 test: test_server test_client
+	make clean
 	./test_server &
 	sleep 1
 	./test_client
