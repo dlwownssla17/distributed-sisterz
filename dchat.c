@@ -73,5 +73,7 @@ int main(int argc, char** argv) {
   // exit chat
   exit_chat();
   
+  printf("\nWhuddup!!!\n");
+  
   return 0;
 }
