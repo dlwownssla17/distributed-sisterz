@@ -41,7 +41,7 @@ int socket_fd = 0;
 /* functions */
 
 // set ip address
-int set_ip_address() {
+int set_ip_address(char* ip_address) {
   struct ifaddrs *ifaddr, *tmp;
   if (getifaddrs(&ifaddr) == -1) {
     perror("getifaddrs");
@@ -72,7 +72,7 @@ int start_chat(char *usr) {
   strncpy(nickname, usr, strlen(usr));
   
   // set ip_address
-  set_ip_address();
+  set_ip_address(ip_address);
   
   // create socket
   RMP_getAddressFor(ip_address, "0", &rmp_addr);
@@ -114,28 +114,42 @@ int start_chat(char *usr) {
 }
 
 // join an existing chat group
-int join_chat(char *usr, char *addr, char *port) {
+int join_chat(char *nickname, char *addr, char *port) {
   int failed_join_attempts;
-  rmp_address suspected_leader;
+  rmp_address suspected_leader, recv_addr;
+  char recv_buff[MAX_BUFFER_LEN];
 
   // get own ip address
+  set_ip_address(ip_address);
+
   // create socket
   RMP_getAddressFor(ip_address, "0", &rmp_addr);
   socket_fd = RMP_createSocket(&rmp_addr);
   
-  // set port_num
+  // print port_num
   sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
   
-  // set is_leader
+  // set not is_leader
   is_leader = 0;
-
 
   if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
     fprintf(stderr, "RMP_getAddressFor error\n");
     exit(1);
   }
 
+  char add_me_cmd[8 + MAX_NICKNAME_LEN];
+  snprintf(add_me_cmd, sizeof(add_me_cmd), "ADD_ME %s", nickname);
+
   for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
+    // ADD_ME
+    RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1, &rmp_addr);
+    
+    // receive response
+    RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr);
+
+    // TODO: check that recv_addr equals suspected_leader
+    
+
 
   }
   
@@ -213,7 +227,7 @@ int empty_lists() {
 int main(int argc, char** argv) {
   // error if invalid number of arguments
   if (argc != 2 && argc != 3) {
-    printf("Usage: dchat <NICKNAME> [<ADDR> <PORT>]\n");
+    printf("Usage: dchat <NICKNAME> [<ADDR:PORT>]\n");
     exit(1);
   }
   int nickname_len = strlen(argv[1]);
@@ -235,7 +249,7 @@ int main(int argc, char** argv) {
   }
   // join an existing chat group
   else {
-    join_chat(argv[1], argv[2], argv[3]);
+    join_chat(argv[1], argv[2]);
   }
   
   // chat (while loop until exit chat)

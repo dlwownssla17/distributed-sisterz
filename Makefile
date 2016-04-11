@@ -32,3 +32,7 @@ RMP/librmp.a :
 clean :
 	rm -rf $(EXEC) $(OBJS)
 	cd RMP && make clean
+
+# check for todos
+todo:
+	! grep -n -H --color=always "//\s*TODO" *.c *.h
