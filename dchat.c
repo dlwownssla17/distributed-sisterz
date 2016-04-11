@@ -111,6 +111,18 @@ int join_chat(char *usr, char *addr, char *port) {
   int failed_join_attempts;
   rmp_address suspected_leader;
 
+  // get own ip address
+  // create socket
+  RMP_getAddressFor(ip_address, "0", &rmp_addr);
+  socket_fd = RMP_createSocket(&rmp_addr);
+  
+  // set port_num
+  sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
+  
+  // set is_leader
+  is_leader = 0;
+
+
   if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
     fprintf(stderr, "RMP_getAddressFor error\n");
     exit(1);
