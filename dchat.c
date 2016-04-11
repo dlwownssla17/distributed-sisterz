@@ -98,8 +98,18 @@ int start_chat(char *usr) {
 }
 
 // join an existing chat group
-int join_chat(char *usr, char *addr_port) {
-  
+int join_chat(char *usr, char *addr, char *port) {
+  int failed_join_attempts;
+  rmp_address suspected_leader;
+
+  if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
+    fprintf(stderr, "RMP_getAddressFor error\n");
+    exit(1);
+  }
+
+  for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
+
+  }
   
   return 0;
 }
@@ -171,7 +181,7 @@ int empty_lists() {
 int main(int argc, char** argv) {
   // error if invalid number of arguments
   if (argc != 2 && argc != 3) {
-    printf("Usage: dchat <NICKNAME> [<ADDR:PORT>]\n");
+    printf("Usage: dchat <NICKNAME> [<ADDR> <PORT>]\n");
     exit(1);
   }
   int nickname_len = strlen(argv[1]);
@@ -183,7 +193,7 @@ int main(int argc, char** argv) {
   // error if spaces or at-symbol in nickname
   char *space = "@ ";
   if (strcspn(argv[1], space) < nickname_len) {
-    printf("Nickname must not contain spaces.\n");
+    printf("Nickname must not contain spaces or at-symbol.\n");
     exit(1);
   }
     
@@ -193,7 +203,7 @@ int main(int argc, char** argv) {
   }
   // join an existing chat group
   else {
-    join_chat(argv[1], argv[2]);
+    join_chat(argv[1], argv[2], argv[3]);
   }
   
   // chat (while loop until exit chat)
