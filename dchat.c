@@ -193,8 +193,8 @@ int main(int argc, char** argv) {
     printf("Nickname is too long; please keep it under %d characters.\n", MAX_NICKNAME_LEN);
     exit(1);
   }
-  // error if spaces in nickname
-  char *space = " ";
+  // error if spaces or at-symbol in nickname
+  char *space = "@ ";
   if (strcspn(argv[1], space) < nickname_len) {
     printf("Nickname must not contain spaces.\n");
     exit(1);
