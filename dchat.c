@@ -387,81 +387,72 @@ int chat_non_leader() {
     // iterate through all handlers
     for (i = 0; i <= fd_max; i++) {
       if (FD_ISSET(i, &read_fds)) {
-	// send message or leave chat (Ctrl-D)
-	if (i == STDIN) {
-	  // error case
-	  if ((num_bytes = read(i, buf, MAX_BUFFER_LEN)) == -1) {
-	    perror("chat_non_leader: read");
-	    exit(1);
-	  }
-	  // send message
-	  else if (num_bytes > 0) {
-	    buf[num_bytes - 1] = '\0';
-	    
-	    // process message request
-	    char message_request_buf[MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN + 1];
-	    snprintf(message_request_buf, sizeof(16 + MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN), "MESSAGE_REQUEST %s= %s", nickname, buf);
-	    
-	    // get rmp_address of leader
-	    RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
-	    if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, num_bytes)) == -1) {
-	      printf("chat_non_leader: RMP_sendTo\n");
-	      exit(1);
-	    }
-	  }
-	  // leave chat
-	  else {
-	    break_loop = 1;
-	    break;
-	  }
-	}
-	// receive message
-	else {
-	  // read in message
-	  RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
-	  if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
-	    printf("chat_non_leader: RMP_listen\n");
-	    exit(1);
-	  }
-	  buf[num_bytes - 1] = '\0';
-	  
-	  // case match for message type
-	  char message_type[20];
-	  char rest_message[MAX_BUFFER_LEN + 1];
-	  if (sscanf(buf, "%s %[^\n]", message_type, rest_message) == EOF) {
-	    perror("chat_non_leader: sscanf for message_type");
-	    exit(1);
-	  }
-	  // receive message
-	  if (!strcmp("MESSAGE_BROADCAST", message_type)) {
-	    int message_id;
-	    char sender_nickname[MAX_NICKNAME_LEN + 1];
-	    char message_payload[MAX_BUFFER_LEN + 1];
-	    if (sscanf(rest_message, "%d %s= %[^\n]", message_id, sender_nickname, message_payload) == EOF) {
-	      perror("chat_non_leader: sscanf for MESSAGE_BROADCAST");
-	      exit(1);
-	    }
-	    clock_num = message_id;
-	    
-	  }
-	  // receive participant update
-	  else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
-	    
-	  }
-	  // receive start election
-	  else if (!strcmp("START_ELECTION", message_type)) {
-	    
-	  }
-	  // receive add me
-	  else if (!strcmp("ADD_ME", message_type)) {
-	    
-	  }
-	  // invalid message
-	  else {
-	    printf("chat_non_leader: Invalid message received.\n");
-	    exit(1);
-	  }
-	}
+  // send message or leave chat (Ctrl-D)
+  if (i == STDIN) {
+    // error case
+    if ((num_bytes = read(i, buf, MAX_BUFFER_LEN)) == -1) {
+      perror("chat_non_leader: read");
+      exit(1);
+    }
+    // send message
+    else if (num_bytes > 0) {
+      buf[num_bytes - 1] = '\0';
+      
+      // process message request
+      char message_request_buf[MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN + 1];
+      snprintf(message_request_buf, sizeof(16 + MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN), "MESSAGE_REQUEST %s= %s", nickname, buf);
+      
+      // get rmp_address of leader
+      RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
+      if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, num_bytes)) == -1) {
+        printf("chat_non_leader: RMP_sendTo\n");
+        exit(1);
+      }
+    }
+    // leave chat
+    else {
+      break_loop = 1;
+      break;
+    }
+  } else { // receive message
+    // read in message
+    RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
+    if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
+      printf("chat_non_leader: RMP_listen\n");
+      exit(1);
+    }
+    buf[num_bytes - 1] = '\0';
+    
+    // case match for message type
+    char message_type[20];
+    char rest_message[MAX_BUFFER_LEN + 1];
+    if (sscanf(buf, "%s %[^\n]", message_type, rest_message) == EOF) {
+      perror("chat_non_leader: sscanf for message_type");
+      exit(1);
+    }
+    // receive message
+    if (!strcmp("MESSAGE_BROADCAST", message_type)) {
+      int message_id;
+      char sender_nickname[MAX_NICKNAME_LEN + 1];
+      char message_payload[MAX_BUFFER_LEN + 1];
+      if (sscanf(rest_message, "%d %s= %[^\n]", message_id, sender_nickname, message_payload) == EOF) {
+        perror("chat_non_leader: sscanf for MESSAGE_BROADCAST");
+        exit(1);
+      }
+      clock_num = message_id;
+      
+    } else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
+      // receive participant update
+    } else if (!strcmp("START_ELECTION", message_type)) {
+      // receive start election
+    } else if (!strcmp("ADD_ME", message_type)) {
+      // receive add me
+    } else {
+      // invalid message
+      printf("chat_non_leader: Invalid message received.\n");
+      exit(1);
+    }
+  }
       }
     }
     // break out of nested loop
@@ -471,6 +462,94 @@ int chat_non_leader() {
   }
   
   return 0;
+}
+
+/**
+ * Exactly what it sounds like (I'm tired)
+ * @param command_buff  [description]
+ * @param buff_len      [description]
+ * @param join_leave_message [description]
+ */
+void generate_participant_update(char* command_buff, int buff_len, char* join_leave_message) {
+  // TODO: handle buffer overflow
+  command_buff += snprintf(command_buff, buff_len, "PARTICIPANT_UPDATE @%s:%s:%s ",
+    leader->nickname, leader->ip_address, leader->port_num);
+
+  Participant *curr_p = p;
+
+  TAILQ_FOREACH(curr_p, participants_head, participants) {
+    if (!curr_p->is_leader) {
+      command_buff += snprintf(command_buff, buff_len, "%s:%s:%s ",
+        curr_p->nickname, curr_p->ip_address, curr_p->port_num);
+    }
+  }
+
+  command_buff += snprintf(command_buff, buff_len, "= %s", join_leave_message);
+}
+
+void broadcast_message(char* message) {
+  Participant *curr_p = p;
+  Participant *prev_p = NULL;
+  int remove_next = 0;
+
+  rmp_address curr_address;
+
+  int message_len = strlen(message);
+
+  int need_update = 0;
+
+  char update_buff[MAX_BUFFER_LEN];
+  int update_buff_pos = 0;
+
+  TAILQ_FOREACH(curr_p, participants_head, participants) {
+    if (prev_p && remove_next) {
+      // free previous
+      free(prev_p->nickname);
+      free(prev_p->ip_address);
+      free(prev_p->port_num);
+      free(prev_p);
+    }
+
+    remove_next = 0;
+
+    if (!curr_p->is_leader) {
+      // get address
+      if (RMP_getAddressFor(curr_p->ip_address, curr_p->port_num, &curr_address) < 0) {
+        fprintf(stderr, "Broadcast RMP_getAddressFor error\n");
+        exit(1);
+      }
+      // send message
+      if (RMP_sendTo(socket_fd, &curr_address, message, message_len + 1) < 0) {
+        // node could not be reached, so remove it and PARTICIPANT_UPDATE
+        need_update = 1;
+        update_buff_pos += snprintf(update_buff + update_buff_pos, MAX_BUFFER_LEN - update_buff_pos,
+          "%s, ", curr_p->nickname);
+        // logically delete
+        TAILQ_REMOVE(participants_head, curr_p, participants);
+        // mark for deletion node
+        remove_next = 1;
+      }
+    }
+  }
+
+  if (prev_p && remove_next) {
+    free(prev_p->nickname);
+    free(prev_p->ip_address);
+    free(prev_p->port_num);
+    free(prev_p);
+  }
+
+  if (need_update) {
+    char update_command[1024];
+    char leave_message[1024];
+
+    // get rid of last comma
+    update_buff[update_buff_pos - 2] = ' ';
+    update_buff[update_buff_pos - 1] = '\0';
+    snprintf(leave_message, 1024, "%s left the chat or crashed", update_buff);
+    generate_participant_update(update_command, sizeof(update_command), leave_message);
+    broadcast_message(update_command);
+  }
 }
 
 // chat for leader
@@ -488,17 +567,87 @@ int chat_leader() {
     }
 
     int break_loop = 0;
+    int num_bytes;
+    char buf[MAX_BUFFER_LEN];
     // iterate through all handlers
     for (i = 0; i <= fd_max; i++) {
       if (FD_ISSET(i, &read_fds)) {
-	// send (multicast) message or leave chat (Ctrl-D)
-	if (i == STDIN) {
-	  
-	}
-	// receive message
-	else {
-	  
-	}
+        // send (multicast) message or leave chat (Ctrl-D)
+        if (i == STDIN) {
+          if ((num_bytes = read(i, buf, MAX_BUFFER_LEN)) == -1) {
+            perror("chat_leader: read");
+            exit(1);
+          }
+          if (num_bytes > 0) {
+            char message_broadcast[1024];
+            snprintf(message_broadcast, sizeof(1024), "MESSAGE_BROADCAST %d %s= %s",
+              clock_num++, nickname, buf);
+
+            broadcast_message(message_broadcast);
+
+            printf("%s:: %s\n", nickname, buf);
+          }
+        } else {
+          if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
+            printf("chat_leader: RMP_listen\n");
+            exit(1);
+          }
+
+          // RECEIVE MESSAGE
+          char command_type[20];
+          char rest_command[MAX_BUFFER_LEN + 1];
+          if (sscanf(buf, "%s %[^\n]", command_type, rest_command) == EOF) {
+            perror("chat_non_leader: sscanf for command_type");
+            exit(1);
+          }
+
+          if (!strcmp("ADD_ME", command_type)) {
+            // create new participant
+            char port_num[6];
+            sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
+
+            // TODO: fix other strncpy's to have +1
+            Participant *new_participant = malloc(sizeof(Participant));
+            new_participant->nickname = malloc(strlen(rest_command) + 1);
+            strncpy(new_participant->nickname, rest_command, strlen(nickname + 1));
+            new_participant->ip_address = inet_ntoa(rmp_addr.sin_addr);
+            new_participant->port_num = malloc(strlen(port_num) + 1);
+            strncpy(new_participant->port_num, port_num, strlen(port_num + 1));
+            new_participant->is_leader = 0;
+            
+            // add participant to list of participants
+            TAILQ_INSERT_TAIL(participants_head, new_participant, participants);
+
+            num_participants++;
+
+            // send out participant update
+            char join_message[MAX_BUFFER_LEN];
+            snprintf(join_message, sizeof(join_message), "%s has joined on %s:%s",
+              rest_command, new_participant->ip_address, new_participant->port_num);
+            char participant_update[MAX_BUFFER_LEN];
+            generate_participant_update(participant_update, sizeof(participant_update),
+              join_message);
+            broadcast_message(participant_update);
+          } else if (!strcmp("MESSAGE_REQUEST", command_type)) {
+            char sender_nickname[MAX_NICKNAME_LEN];
+            char payload[MAX_BUFFER_LEN];
+            // TODO: check for right # of matches
+            if (sscanf(rest_command, "%[^ =]= %[^\n]", sender_nickname, payload) == EOF) {
+              perror("chat_non_leader: sscanf for command_type");
+              exit(1);
+            }
+
+            char message_broadcast[1024];
+            snprintf(message_broadcast, sizeof(1024), "MESSAGE_BROADCAST %d %s= %s",
+              clock_num++, sender_nickname, payload);
+
+            broadcast_message(message_broadcast);
+
+            printf("%s:: %s\n", sender_nickname, payload);
+          } else {
+            printf("Unrecognized command: %s\n", buf);
+          }
+        }
       }
     }
     // break out of nested loop

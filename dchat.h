@@ -35,7 +35,7 @@ typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
 /* constants */
 
 // maximum buffer length
-#define MAX_BUFFER_LEN 128
+#define MAX_BUFFER_LEN 1024
 
 // maximum nickname length
 #define MAX_NICKNAME_LEN 20
