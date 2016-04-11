@@ -61,7 +61,7 @@ typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 int start_chat(char *usr);
 
 // join an existing chat group
-int join_chat(char *usr, char *addr_port);
+int join_chat(char *usr, char *addr, char *port);
 
 // chat (until user decides to leave chat or crash)
 int chat();
