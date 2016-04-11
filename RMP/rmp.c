@@ -122,9 +122,11 @@ int receive_and_process_message(int socket_fd, struct sockaddr_in *src_address,
     		// and length.
     	    message_buffer = get_receive_buffer_for(src_address);
     	    if(message_buffer->occupied && *id == message_buffer->id) {
-    	    	memcpy(result_buffer, message_buffer->message, buffer_size);
+    	    	size_t copy_size = buffer_size < message_buffer->message_length ? buffer_size : message_buffer->message_length;
+    	    	memcpy(result_buffer, message_buffer->message, copy_size);
     	    	num_bytes_received = message_buffer->message_length;
     	    	message_buffer->occupied = 0;
+    	    	free(message_buffer->message);
     	    }
     		break;
     }

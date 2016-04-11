@@ -9,5 +9,8 @@ static const char CLIENT_PORT[] = "5344";
 
 static const char MESSAGE[] = "message";
 static const char MESSAGE2[] = "message2";
+static const char MESSAGE3[] = "message3";
+static const char MESSAGE4[] = "message4";
+
 
 #endif
