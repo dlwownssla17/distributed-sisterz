@@ -47,6 +47,8 @@ typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 // maximum buffer length
 #define MAX_BUFFER_LEN 128
 
+#define NICKNAME_LIMIT 20
+
 // maximum ip address length
 #define MAX_IP_ADDRESS_LEN 39
 

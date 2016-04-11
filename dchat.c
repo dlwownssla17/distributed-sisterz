@@ -19,7 +19,7 @@
 
 /* global variables */
 
-char nickname[MAX_BUFFER_LEN];
+char nickname[MAX_NICKNAME_LEN + 1];
 char ip_address[MAX_IP_ADDRESS_LEN];
 int port_num = 0;
 int clock_num = 0;
@@ -69,14 +69,24 @@ int exit_chat() {
 int main(int argc, char** argv) {
   // error if invalid number of arguments
   if (argc != 2 && argc != 3) {
-    printf("Usage: dchat <USER> -OR- dchat <USER> <ADDR:PORT>\n");
+    printf("Usage: dchat <NICKNAME> [<ADDR:PORT>]\n");
     exit(1);
   }
+  int nickname_len = strlen(argv[1]);
   // error if too long nickname
-  if (strlen(argv[1]) > MAX_BUFFER_LEN) {
-    printf("Nickname is too long; please keep it under %d characters.\n", MAX_BUFFER_LEN);
+  if (nickname_len > MAX_NICKNAME_LEN) {
+    printf("Nickname is too long; please keep it under %d characters.\n", MAX_NICKNAME_LEN);
     exit(1);
   }
+
+  // check for spaces in nickname
+  char* space = " ";
+  if (strcspn(argv[0], space) < nickname_len) {
+    printf("Nickname must not contain spaces\n");
+    exit(1);
+  }
+
+  strcpy(nickname, argv[0]);
     
   // start a new chat group as the leader
   if (argc == 2) {
