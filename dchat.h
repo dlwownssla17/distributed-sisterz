@@ -52,6 +52,9 @@ typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 // maximum ip address length (IPv4)
 #define MAX_IP_ADDRESS_LEN 15
 
+// maximum port num length
+#define MAX_PORT_NUM_LEN 5
+
 /* functions */
 
 // start a new chat group as the leader
