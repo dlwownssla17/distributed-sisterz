@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include "rmp.h"
 #include "protocol.h"
 
 
@@ -69,7 +70,7 @@ int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
     if(bytes_received == -1) {
     	if(errno == EAGAIN || errno == EWOULDBLOCK) {  // recvfrom timed out
     		free(receive_buffer);
-    		return -2;
+    		return RMP_E_TIMEOUT;
     	} else {
 	        perror("recvfrom failed in receive_rmp_datagram");
 	        free(receive_buffer);
