@@ -12,8 +12,15 @@ typedef struct sockaddr_in rmp_address;
 int RMP_getAddressFor(const char *ip, const char *port, rmp_address *address_dst);
 
 /*
+ * Returns the port number stored in the given address.
+ */
+int RMP_getPortFrom(rmp_address *address);
+
+/*
  * Sets up an RMP socket that can send message and be listened on for incoming
- * connections on the given address. 
+ * connections on the given address.  If the given port number is 0 (i.e. is a
+ * request for an ephemeral port), then the given address will be updated with
+ * the chosen port number.
  * Returns a socket file descriptor or ­-1 on error.
  */
 int RMP_createSocket(rmp_address *address);
