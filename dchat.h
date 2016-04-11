@@ -24,7 +24,7 @@ typedef struct Participant {
   char *ip_address;
   int port_num;
   int is_leader;
-  Participant leader;
+  struct Participant *leader;
   // TAILQ_ENTRY(Message) messages;
   TAILQ_ENTRY(Participant) participants;
 } Participant;
