@@ -167,11 +167,11 @@ void process_participant_update (char* command, int joining) {
     // create new participant
     new_participant = malloc(sizeof(Participant));
     new_participant->nickname = malloc(strlen(nickname) + 1);
-    strncpy(new_participant->nickname, nickname, strlen(nickname));
+    strncpy(new_participant->nickname, nickname, strlen(nickname) + 1);
     new_participant->ip_address = malloc(strlen(ip_address) + 1);
-    strncpy(new_participant->ip_address, ip_address, strlen(ip_address));
+    strncpy(new_participant->ip_address, ip_address, strlen(ip_address) + 1);
     new_participant->port_num = malloc(strlen(port_num) + 1);
-    strncpy(new_participant->port_num, port_num, strlen(port_num));
+    strncpy(new_participant->port_num, port_num, strlen(port_num)  + 1);
     new_participant->is_leader = is_first;
 
     if (is_first) {
@@ -319,6 +319,7 @@ int join_chat(char *i_nickname, char *addr_port) {
         fprintf(stderr, "On command: %s\n", recv_buff);
         exit(1);
       }
+
       // set new leader
       if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
         fprintf(stderr, "RMP_getAddressFor 3 error\n");
@@ -405,7 +406,11 @@ int chat_non_leader() {
             snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", nickname, buf);
 
             // get rmp_address of leader
-            RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
+            if (RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr) == -1) {
+              printf("%s ; %s\n", leader->ip_address, leader->port_num);
+              printf("chat_non_leader: RMP_getAddressFor\n");
+              exit(1);
+            }
             if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf,
                 strlen(message_request_buf) + 1)) == -1) {
               printf("chat_non_leader: RMP_sendTo\n");
@@ -413,7 +418,7 @@ int chat_non_leader() {
             }
           }
           // leave chat
-          else {
+          else if (num_bytes == 0) {
             break_loop = 1;
             break;
           }
@@ -448,23 +453,17 @@ int chat_non_leader() {
           }
           // receive participant update
           else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
-            process_participant_update(buf, 1);
+            process_participant_update(buf, 0);
           }
           // receive start election
           else if (!strcmp("START_ELECTION", message_type)) {
             
           }
           // receive add me
-          else if (!strcmp("ADD_ME", message_type)) {
-            char sender_nickname[MAX_NICKNAME_LEN + 1];
-            if (sscanf(rest_message, "%s", sender_nickname) == EOF) {
-              perror("chat_non_leader: sscanf for ADD_ME");
-              exit(1);
-            }
-            
+          else if (!strcmp("ADD_ME", message_type)) {  
             // process message request
             char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
-            snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s %s", leader->ip_address, leader->port_num);
+            snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s:%s", leader->ip_address, leader->port_num);
             
             // send message request
             if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, strlen(message_request_buf) + 1)) == -1) {
@@ -613,6 +612,9 @@ int chat_leader() {
             broadcast_message(message_broadcast);
 
             printf("%s:: %s\n", nickname, buf);
+          } else if (num_bytes == 0) {
+            break_loop = 1;
+            break;
           }
         } else {
           if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
@@ -631,6 +633,8 @@ int chat_leader() {
           }
 
           if (!strcmp("ADD_ME", command_type)) {
+            // TODO: check for duplicate nicknames
+
             // create new participant
             char port_num[6];
             sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
@@ -638,7 +642,7 @@ int chat_leader() {
             // TODO: fix other strncpy's to have +1
             Participant *new_participant = malloc(sizeof(Participant));
             new_participant->nickname = malloc(strlen(rest_command) + 1);
-            strncpy(new_participant->nickname, rest_command, strlen(nickname) + 1);
+            strncpy(new_participant->nickname, rest_command, strlen(rest_command) + 1);
             new_participant->ip_address = inet_ntoa(rmp_addr.sin_addr);
             new_participant->port_num = malloc(strlen(port_num) + 1);
             strncpy(new_participant->port_num, port_num, strlen(port_num) + 1);
