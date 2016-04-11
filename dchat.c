@@ -120,7 +120,7 @@ void process_participant_update (char* command, int joining) {
   empty_list();
 
   // skip over "PARTICIPANT_UPDATE"
-  char* currPos = strchr(command, "@");
+  char* currPos = strchr(command, '@');
 
   // skip leading spaces
   while (currPos[0] == ' ') {
@@ -140,10 +140,10 @@ void process_participant_update (char* command, int joining) {
     if (scan_ret == EOF) {
       // EOF or error
       perror("process_participant_update sscanf");
-      fprintf(stderr, "At: %s\n", recv_buff);
+      fprintf(stderr, "At: %s\n", command);
       exit(1);
     } else if (scan_ret < 3) {
-      fprintf(stderr, "Invalid participant at: %s\n", recv_buff);
+      fprintf(stderr, "Invalid participant at: %s\n", command);
       exit(1);
     }
 
@@ -222,7 +222,8 @@ int join_chat(char *nickname, char *addr_port) {
   strncpy(addr, addr_port, sizeof(addr));
   addr[colon_pos] = '\0';
 
-  strncpy(port, addr_port + colon_pos + 1, sizeof(port));
+  char my_port[6];
+  strncpy(my_port, addr_port + colon_pos + 1, sizeof(my_port));
 
   // get own ip address
   set_ip_address(ip_address);
@@ -232,7 +233,6 @@ int join_chat(char *nickname, char *addr_port) {
   socket_fd = RMP_createSocket(&rmp_addr);
   
   // print my port_num
-  char port[6];
   sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
   
   // set is_leader to false
@@ -252,7 +252,10 @@ int join_chat(char *nickname, char *addr_port) {
   // try to join
   for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
     // send ADD_ME
-    RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1);
+    if (RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1) < 0) {
+      fprintf(stderr, "RMP_sendTo error\n");
+      exit(1);
+    }
     
     // receive response
     RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr);
