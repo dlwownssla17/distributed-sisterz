@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,13 @@ int RMP_getAddressFor(const char *ip, const char *port, rmp_address *address_dst
 
 
 
+int RMP_getPortFrom(rmp_address *address)
+{
+	return ntohs(address->sin_port);
+}
+
+
+
 int RMP_createSocket(rmp_address *address)
 {
 	// Create socket
@@ -45,6 +53,14 @@ int RMP_createSocket(rmp_address *address)
 	if(status == -1) {
 		perror(NULL);
 		return -1;
+	}
+
+	// Update address
+	socklen_t address_size = sizeof(rmp_address);
+	status = getsockname(socket_fd,
+	                     (struct sockaddr *) address, &address_size);
+	if(status == -1) {
+		perror(NULL);
 	}
 
 	return socket_fd;
