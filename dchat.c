@@ -31,8 +31,6 @@ Participant *leader;
 
 Participant *p;
 ParticipantsHead *participants_head;
-Message *m; // only used by the leader
-MessagesHead *messages_head; // only used by the leader
 
 int num_participants = 0;
 
@@ -97,11 +95,9 @@ int start_chat(char *usr) {
   strncpy(leader->port_num, port_num, strlen(port_num));
   leader->is_leader = is_leader;
   
-  // initialize list of participants and list of messages
+  // initialize list of participants
   participants_head = malloc(sizeof(ParticipantsHead));
   TAILQ_INIT(participants_head);
-  messages_head = malloc(sizeof(MessagesHead));
-  TAILQ_INIT(messages_head);
   
   // add participant (leader) to list of participants
   TAILQ_INSERT_TAIL(participants_head, leader, participants);
@@ -114,6 +110,10 @@ int start_chat(char *usr) {
   IF_DEBUG(printf("MY PORT NUM: %s\n", port_num));
   
   return 0;
+}
+
+void process_participant_update (char* command) {
+
 }
 
 // join an existing chat group
@@ -175,11 +175,9 @@ int join_chat(char *nickname, char *addr_port) {
       fprintf(stderr, "On command: %s\n", recv_buff);
       exit(1);
     } if (strcmp("PARTICIPANT_UPDATE", command_type)) {
-      // initialize list of participants and list of messages
+      // initialize list of participants 
       participants_head = malloc(sizeof(ParticipantsHead));
       TAILQ_INIT(participants_head);
-      messages_head = malloc(sizeof(MessagesHead));
-      TAILQ_INIT(messages_head);
 
       // TODO: this case, use same parser from chat() loop
       return 1;
@@ -220,12 +218,11 @@ int chat() {
 
 // leave chat (free all relevant data structures)
 int exit_chat() {
-  // empty list of participants and list of messages
-  empty_lists();
+  // empty list of participants
+  empty_list();
   
-  // free list of participants and list of messages
+  // free list of participants
   free(participants_head);
-  free(messages_head);
   
   RMP_closeSocket(socket_fd);
   
@@ -234,8 +231,8 @@ int exit_chat() {
   return 0;
 }
 
-// empty list of participants and list of messages
-int empty_lists() {
+// empty list of participants
+int empty_list() {
   // remove all participants
   Participant *curr_p = p;
   Participant *prev_p = NULL;
@@ -254,22 +251,6 @@ int empty_lists() {
     free(prev_p->ip_address);
     free(prev_p->port_num);
     free(prev_p);
-  }
-
-  // remove all messages
-  Message *curr_m = m;
-  Message *prev_m = NULL;
-  TAILQ_FOREACH(curr_m, messages_head, messages) {
-    if (prev_m) {
-      free(prev_m->msg);
-      free(prev_m);
-    }
-    TAILQ_REMOVE(messages_head, curr_m, messages);
-    prev_m = curr_m;
-  }
-  if (prev_m) {
-    free(prev_m->msg);
-    free(prev_m);
   }
 
   // set number of participants back to zero
