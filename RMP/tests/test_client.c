@@ -46,6 +46,10 @@ int main()
 	assert(num_bytes_received == sizeof(MESSAGE4), "RMP_listen didn't return the expected number of bytes for MESSAGE4");
 	assert(strncmp(buffer, MESSAGE4, sizeof(MESSAGE4)) == 0, "RMP_listen didn't get the right message for MESSAGE4.");
 
+	// Send third message, expect no acknowledgment
+	bytes_sent = RMP_sendTo(my_socket, &listener_address, MESSAGE, sizeof(MESSAGE));
+	assert(bytes_sent == -2, "RMP_sendTo didn't return properly on ack timeout");
+
 	// Close socket
 	RMP_closeSocket(my_socket);
 

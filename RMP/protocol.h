@@ -17,7 +17,7 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
  * Receives a message on the given socket.  Places its sender address in
  * src_address, the metadata in type and id, and up to len bytes of payload in
  * payload.
- * Returns the number of bytes received or ­-1 on error.
+ * Returns the number of bytes received or -2 on timeout or ­-1 on error.
  */
 int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
                          enum message_type *type, message_id *id,

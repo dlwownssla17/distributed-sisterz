@@ -68,7 +68,7 @@ struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
 /*
  * Receives and processes a message, placing its information in the given
  * arguments.
- * Returns the number of bytes received on success and -1 on failure.
+ * Returns the number of bytes received on success or -2 on timeout or -1 on failure.
  */
 int receive_and_process_message(int socket_fd, struct sockaddr_in *src_address,
                                 enum message_type *type, message_id *id,
@@ -78,8 +78,8 @@ int receive_and_process_message(int socket_fd, struct sockaddr_in *src_address,
 	int num_bytes_received = receive_rmp_datagram(socket_fd,
 	                                              src_address, type, id,
 	                                              result_buffer, buffer_size);
-    if(num_bytes_received == -1) {
-        return -1;
+    if(num_bytes_received < 0) {
+        return num_bytes_received;
     }
 
     // Process the message
@@ -212,23 +212,48 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	outgoing_buffer->message_length = num_bytes;
 
 	// Wait for ACK
+
+	// First set socket receive timeout
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 20000;  // 20ms
+	int status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	if(status == -1) {
+		perror("setsockopt failed to set timeout in RMP_sendTo");
+		return -1;
+	}
+
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
 	char *result_buffer = (char *) malloc(MAX_MESSAGE_SIZE * sizeof(char *));
 	do {
-		int status = receive_and_process_message(socket_fd, &recv_src_address,
+		status = receive_and_process_message(socket_fd, &recv_src_address,
 	                                &recv_type, &recv_id,
 	                                result_buffer, MAX_MESSAGE_SIZE);
-		if(status == -1) {
+		if(status < 0) {
 			free(result_buffer);
-			return -1;
+			// Reset socket receive timeout
+			tv.tv_sec = 0;
+			tv.tv_usec = 0;
+			setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+			return status;
 		}		
 	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
 	        recv_type != ACK ||
 	        recv_id != new_id);
 
 	free(result_buffer);
+
+	// Reset socket receive timeout
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	if(status == -1) {
+		perror("setsockopt failed to reset timeout in RMP_sendTo");
+		return -1;
+	}
+
 	return num_bytes_sent;
 }
 
@@ -244,8 +269,8 @@ int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address
 		num_bytes_received = receive_and_process_message(socket_fd, &recv_src_address,
 	                                			 			 &recv_type, &recv_id,
 	                                			 			 buffer, len);
-		if(num_bytes_received == -1) {
-			return -1;
+		if(num_bytes_received < 0) {
+			return num_bytes_received;
 		}		
 	} while(recv_type != SYN_ACK);
 

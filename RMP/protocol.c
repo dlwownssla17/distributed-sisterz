@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,9 +67,14 @@ int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
     int bytes_received = recvfrom(socket_fd, receive_buffer, len + header_size, 0,
                                   (struct sockaddr *) src_address, &address_len);
     if(bytes_received == -1) {
-        perror("recvfrom failed in receive_rmp_datagram");
-        free(receive_buffer);
-        return -1;
+    	if(errno == EAGAIN || errno == EWOULDBLOCK) {  // recvfrom timed out
+    		free(receive_buffer);
+    		return -2;
+    	} else {
+	        perror("recvfrom failed in receive_rmp_datagram");
+	        free(receive_buffer);
+	        return -1;
+    	}
     }
 
     // Parse out the header
