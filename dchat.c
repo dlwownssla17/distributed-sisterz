@@ -340,11 +340,10 @@ int chat() {
   // TODO: reduce duplicate code between chat_non_leader() and chat_leader()
   
   // non-leader chat
-  if (is_leader) {
+  if (!is_leader) {
     chat_non_leader();
-  }
-  // leader chat
-  else {
+  } else {
+    // leader chat
     chat_leader();
   }
   
@@ -387,72 +386,95 @@ int chat_non_leader() {
     // iterate through all handlers
     for (i = 0; i <= fd_max; i++) {
       if (FD_ISSET(i, &read_fds)) {
-  // send message or leave chat (Ctrl-D)
-  if (i == STDIN) {
-    // error case
-    if ((num_bytes = read(i, buf, MAX_BUFFER_LEN)) == -1) {
-      perror("chat_non_leader: read");
-      exit(1);
-    }
-    // send message
-    else if (num_bytes > 0) {
-      buf[num_bytes - 1] = '\0';
-      
-      // process message request
-      char message_request_buf[MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN + 1];
-      snprintf(message_request_buf, sizeof(16 + MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN), "MESSAGE_REQUEST %s= %s", nickname, buf);
-      
-      // get rmp_address of leader
-      RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
-      if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, num_bytes)) == -1) {
-        printf("chat_non_leader: RMP_sendTo\n");
-        exit(1);
-      }
-    }
-    // leave chat
-    else {
-      break_loop = 1;
-      break;
-    }
-  } else { // receive message
-    // read in message
-    RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
-    if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
-      printf("chat_non_leader: RMP_listen\n");
-      exit(1);
-    }
-    buf[num_bytes - 1] = '\0';
-    
-    // case match for message type
-    char message_type[20];
-    char rest_message[MAX_BUFFER_LEN + 1];
-    if (sscanf(buf, "%s %[^\n]", message_type, rest_message) == EOF) {
-      perror("chat_non_leader: sscanf for message_type");
-      exit(1);
-    }
-    // receive message
-    if (!strcmp("MESSAGE_BROADCAST", message_type)) {
-      int message_id;
-      char sender_nickname[MAX_NICKNAME_LEN + 1];
-      char message_payload[MAX_BUFFER_LEN + 1];
-      if (sscanf(rest_message, "%d %s= %[^\n]", message_id, sender_nickname, message_payload) == EOF) {
-        perror("chat_non_leader: sscanf for MESSAGE_BROADCAST");
-        exit(1);
-      }
-      clock_num = message_id;
-      
-    } else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
-      // receive participant update
-    } else if (!strcmp("START_ELECTION", message_type)) {
-      // receive start election
-    } else if (!strcmp("ADD_ME", message_type)) {
-      // receive add me
-    } else {
-      // invalid message
-      printf("chat_non_leader: Invalid message received.\n");
-      exit(1);
-    }
-  }
+        // send message or leave chat (Ctrl-D)
+        if (i == STDIN) {
+          // error case
+          if ((num_bytes = read(i, buf, MAX_BUFFER_LEN)) == -1) {
+            perror("chat_non_leader: read");
+            exit(1);
+          }
+          // send message
+          else if (num_bytes > 0) {
+            buf[num_bytes - 1] = '\0';
+            
+            // process message request
+            char message_request_buf[16 + MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN + 1];
+            snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", nickname, buf);
+            
+            // get rmp_address of leader
+            RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
+            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, num_bytes)) == -1) {
+              printf("chat_non_leader: RMP_sendTo\n");
+              exit(1);
+            }
+          }
+          // leave chat
+          else {
+            break_loop = 1;
+            break;
+          }
+        }
+        // receive message
+        else {
+          // read in message
+          RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
+          if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &rmp_addr)) == -1) {
+            printf("chat_non_leader: RMP_listen\n");
+            exit(1);
+          }
+          buf[num_bytes - 1] = '\0';
+          
+          // case match for message type
+          char message_type[20];
+          char rest_message[MAX_BUFFER_LEN + 1];
+          if (sscanf(buf, "%s %[^\n]", message_type, rest_message) == EOF) {
+            perror("chat_non_leader: sscanf for message_type");
+            exit(1);
+          }
+          // receive message
+          if (!strcmp("MESSAGE_BROADCAST", message_type)) {
+            int message_id;
+            char sender_nickname[MAX_NICKNAME_LEN + 1];
+            char message_payload[MAX_BUFFER_LEN + 1];
+            if (sscanf(rest_message, "%d %s= %[^\n]", message_id, sender_nickname, message_payload) == EOF) {
+              perror("chat_non_leader: sscanf for MESSAGE_BROADCAST");
+              exit(1);
+            }
+            clock_num = message_id;
+            printf("%s:: %s\n", sender_nickname, message_payload);
+          }
+          // receive participant update
+          else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
+            process_participant_update(buf, 1);
+          }
+          // receive start election
+          else if (!strcmp("START_ELECTION", message_type)) {
+            
+          }
+          // receive add me
+          else if (!strcmp("ADD_ME", message_type)) {
+            char sender_nickname[MAX_NICKNAME_LEN + 1];
+            if (sscanf(rest_message, "%s", sender_nickname) == EOF) {
+              perror("chat_non_leader: sscanf for ADD_ME");
+              exit(1);
+            }
+            
+            // process message request
+            char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
+            snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s %s", leader->ip_address, leader->port_num);
+            
+            // send message request
+            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, sizeof(message_request_buf))) == -1) {
+              printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
+              exit(1);
+            }
+          }
+          // invalid message
+          else {
+            printf("chat_non_leader: Invalid message received.\n");
+            exit(1);
+          }
+        }
       }
     }
     // break out of nested loop
