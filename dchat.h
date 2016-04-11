@@ -18,12 +18,37 @@
 
 /* structs */
 
+// participant struct
+typedef struct Participant {
+  char *nickname;
+  char *ip_address;
+  int port_num;
+  int is_leader;
+  Participant leader;
+  // TAILQ_ENTRY(Message) messages;
+  TAILQ_ENTRY(Participant) participants;
+} Participant;
 
+// list of participants
+typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
+
+// message struct
+typedef struct Message {
+  char *msg;
+  int seq_num;
+  TAILQ_ENTRY(Message) messages;
+} Message;
+
+// list of messages
+typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 
 /* constants */
 
 // maximum buffer length
 #define MAX_BUFFER_LEN 128
+
+// maximum ip address length
+#define MAX_IP_ADDRESS_LEN 39
 
 /* functions */
 

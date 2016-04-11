@@ -19,7 +19,19 @@
 
 /* global variables */
 
-char username[MAX_BUFFER_LENGTH];
+char nickname[MAX_BUFFER_LEN];
+char ip_address[MAX_IP_ADDRESS_LEN];
+int port_num = 0;
+int clock_num = 0;
+int is_leader = 0;
+Participant *leader;
+
+Participant *p;
+ParticipantsHead *participants_head;
+Message *m;
+MessagesHead *messages_head;
+
+int num_participants = 0;
 
 /* functions */
 
@@ -48,6 +60,8 @@ int chat() {
 int exit_chat() {
   
   
+  printf("\nYou left the chat.\n");
+  
   return 0;
 }
 
@@ -58,8 +72,14 @@ int main(int argc, char** argv) {
     printf("Usage: dchat <USER> -OR- dchat <USER> <ADDR:PORT>\n");
     exit(1);
   }
+  // error if too long nickname
+  if (strlen(argv[1]) > MAX_BUFFER_LEN) {
+    printf("Nickname is too long; please keep it under %d characters.\n", MAX_BUFFER_LEN);
+    exit(1);
+  }
+    
   // start a new chat group as the leader
-  else if (argc == 2) {
+  if (argc == 2) {
     start_chat(argv[1]);
   }
   // join an existing chat group
@@ -72,8 +92,6 @@ int main(int argc, char** argv) {
   
   // exit chat
   exit_chat();
-  
-  printf("\nWhuddup!!!\n");
   
   return 0;
 }
