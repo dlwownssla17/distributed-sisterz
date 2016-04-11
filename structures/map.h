@@ -18,18 +18,18 @@ void map_free(map *m);
  * If a value was already associated with that key, it will be replaced.
  * Returns 0 on success or -1 on failure.
  */
-int map_put(map *m, int key, void *value);
+int map_put(map *m, long long key, void *value);
 
 /*
  * Gets the item associated with the given key in the given map.
  * Returns NULL if no such key is in the map.
  */
-void* map_get(map *m, int key);
+void* map_get(map *m, long long key);
 
 /*
  * Removes and returns the item associated with the given key in the given map.
  * Returns NULL if no such key is in the map.
  */
-void* map_remove(map *m, int key);
+void* map_remove(map *m, long long key);
 
 #endif
