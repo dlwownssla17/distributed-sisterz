@@ -3,7 +3,7 @@
 #include "map.h"
 
 struct map_pair {
-	int key;
+	long long key;
 	void *value;
 	LIST_ENTRY(map_pair) entries;
 };
@@ -16,7 +16,7 @@ struct map {
 
 
 
-struct map_pair* find_pair_by_key(map *m, int key)
+struct map_pair* find_pair_by_key(map *m, long long key)
 {
 	struct map_pair *current;
 	LIST_FOREACH(current, &(m->pairs), entries)
@@ -47,7 +47,7 @@ void map_free(map *m)
 
 
 
-int map_put(map *m, int key, void *value)
+int map_put(map *m, long long key, void *value)
 {
 	struct map_pair *target_pair = find_pair_by_key(m, key);
 	if(target_pair != NULL) {
@@ -70,7 +70,7 @@ int map_put(map *m, int key, void *value)
 
 
 
-void* map_get(map *m, int key)
+void* map_get(map *m, long long key)
 {
 	struct map_pair *target_pair = find_pair_by_key(m, key);
 	if(target_pair != NULL) {
@@ -82,7 +82,7 @@ void* map_get(map *m, int key)
 
 
 
-void* map_remove(map *m, int key)
+void* map_remove(map *m, long long key)
 {
 	struct map_pair *target_pair = find_pair_by_key(m, key);
 	if(target_pair == NULL) {

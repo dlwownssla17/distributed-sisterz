@@ -62,6 +62,22 @@ void test_put_and_remove()
 	map_free(m);	
 }
 
+void test_put_updates()
+{
+	void *payload = (void *) 7;
+	void *payload2 = (void *) 8;
+
+	map *m = map_new();
+	map_put(m, 1, payload);
+	map_put(m, 1, payload2);
+
+	void *result = map_remove(m, 1);
+	assert(result == payload2, "remove should return what put inserted (tpu)");
+
+
+	map_free(m);	
+}
+
 void test_complex()
 {
 	void *payload = (void *) 7;
@@ -104,5 +120,6 @@ int main()
 	test_remove_fails();
 	test_put_and_get();
 	test_put_and_remove();
+	test_put_updates();
 	test_complex();
 }
