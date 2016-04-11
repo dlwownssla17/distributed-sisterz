@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,20 +9,19 @@
 
 struct header {
 	enum message_type type;
-	long int id;
+	message_id id;
 };
 
 
 
 int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
-                      enum message_type type, long int id,
+                      enum message_type type, message_id id,
                		  const void *payload, int num_bytes)
 {
 	// Allocate a buffer for [header + payload]
 	size_t header_size = sizeof(struct header);
 	void *send_buffer = malloc(num_bytes + header_size);
 	if(send_buffer == NULL) {
-		perror(NULL);
 		return -1;
 	}
 
@@ -39,7 +39,7 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
 	                            (struct sockaddr *) destination,
 	                            sizeof(struct sockaddr_in));
 	if(num_bytes_sent == -1) {
-		perror(NULL);
+		perror("sendto failed in send_rmp_datagram");
 		free(send_buffer);
 		return -1;
 	}
@@ -52,14 +52,13 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
 
 
 int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
-                         enum message_type *type, long int *id,
+                         enum message_type *type, message_id *id,
 						 void *payload, size_t len)
 {
 	// Allocate a buffer for [header + payload]
 	size_t header_size = sizeof(struct header);
 	void *receive_buffer = malloc(len + header_size);
 	if(receive_buffer == NULL) {
-		perror(NULL);
 		return -1;
 	}
 
@@ -68,9 +67,14 @@ int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
     int bytes_received = recvfrom(socket_fd, receive_buffer, len + header_size, 0,
                                   (struct sockaddr *) src_address, &address_len);
     if(bytes_received == -1) {
-        perror(NULL);
-        free(receive_buffer);
-        return -1;
+    	if(errno == EAGAIN || errno == EWOULDBLOCK) {  // recvfrom timed out
+    		free(receive_buffer);
+    		return -2;
+    	} else {
+	        perror("recvfrom failed in receive_rmp_datagram");
+	        free(receive_buffer);
+	        return -1;
+    	}
     }
 
     // Parse out the header

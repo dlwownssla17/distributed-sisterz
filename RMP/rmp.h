@@ -3,6 +3,8 @@
 
 #include <netinet/in.h>
 
+#define MAX_MESSAGE_SIZE 65000
+
 typedef struct sockaddr_in rmp_address;
 
 /*
@@ -31,7 +33,7 @@ int RMP_createSocket(rmp_address *address);
  * Will send up to 65,502 bytes of data at a time, all remaining bytes will be truncated.
  * Will block and retry sending until the recipient acknowledges the message OR
  * at least the timeout value of 100ms is reached.
- * Returns the number of bytes sent or ­-1 on error.
+ * Returns the number of bytes sent or ­-2 on acknowledgment timeout or -1 on error.
  */
 int RMP_sendTo(int socket_fd, rmp_address *destination,
                const void *buffer, int num_bytes);
