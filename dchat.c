@@ -114,10 +114,26 @@ int start_chat(char *usr) {
 }
 
 // join an existing chat group
-int join_chat(char *nickname, char *addr, char *port) {
+int join_chat(char *nickname, char *addr_port) {
   int failed_join_attempts;
   rmp_address suspected_leader, recv_addr;
   char recv_buff[MAX_BUFFER_LEN];
+
+  // split addr_port into addr and port
+  char addr[MAX_IP_ADDRESS_LEN + 1];
+  char port[6];
+
+  int colon_pos = strcspn(addr_port, ":");
+
+  if (colon_pos == strlen(addr_port)) {
+    fprintf(stderr, "Address must be of the form <ip>:<port>\n");
+    exit(1);
+  }
+
+  strncpy(addr, addr_port, sizeof(addr));
+  addr[colon_pos] = '\0';
+
+  strncpy(port, addr_port + colon_pos + 1, sizeof(port));
 
   // get own ip address
   set_ip_address(ip_address);
@@ -142,14 +158,19 @@ int join_chat(char *nickname, char *addr, char *port) {
 
   for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
     // ADD_ME
-    RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1, &rmp_addr);
+    RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1);
     
     // receive response
     RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr);
 
     // TODO: check that recv_addr equals suspected_leader
-    
+    char command_type[20];
+    if (sscanf(recv_buff, "%s ", command_type)) {
 
+    }
+    if (strcmp("PARTICIPANT_UPDATE", command_type)) {
+      
+    }
 
   }
   
@@ -237,8 +258,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
   // error if spaces or at-symbol in nickname
-  char *space = "@ ";
-  if (strcspn(argv[1], space) < nickname_len) {
+  if (strcspn(argv[1], "@ ") < nickname_len) {
     printf("Nickname must not contain spaces or at-symbol.\n");
     exit(1);
   }
