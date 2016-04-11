@@ -22,7 +22,7 @@
 typedef struct Participant {
   char *nickname;
   char *ip_address;
-  int port_num;
+  char *port_num;
   int is_leader;
   // TAILQ_ENTRY(Message) messages;
   TAILQ_ENTRY(Participant) participants;
@@ -51,6 +51,9 @@ typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 
 // maximum ip address length (IPv4)
 #define MAX_IP_ADDRESS_LEN 15
+
+// maximum port num length
+#define MAX_PORT_NUM_LEN 5
 
 /* functions */
 

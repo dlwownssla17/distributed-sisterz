@@ -21,9 +21,9 @@
 
 /* global variables */
 
-char nickname[MAX_NICKNAME_LEN];
-char ip_address[MAX_IP_ADDRESS_LEN];
-int port_num = 0;
+char nickname[MAX_NICKNAME_LEN + 1];
+char ip_address[MAX_IP_ADDRESS_LEN + 1];
+char port_num[MAX_PORT_NUM_LEN + 1];
 int clock_num = 0; // only used by the leader
 int is_leader = 0;
 Participant *leader;
@@ -34,6 +34,9 @@ Message *m; // only used by the leader
 MessagesHead *messages_head; // only used by the leader
 
 int num_participants = 0;
+
+rmp_address rmp_addr;
+int socket_fd = 0;
 
 /* functions */
 
@@ -64,8 +67,12 @@ int start_chat(char *usr) {
     exit(1);
   }
   
-  // set port_num
+  // create socket
+  RMP_getAddressFor(ip_address, "0", &rmp_addr);
+  socket_fd = RMP_createSocket(&rmp_addr);
   
+  // set port_num
+  sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
   
   // set is_leader
   is_leader = 1;
@@ -76,7 +83,8 @@ int start_chat(char *usr) {
   strncpy(leader->nickname, nickname, strlen(nickname));
   leader->ip_address = malloc(strlen(ip_address));
   strncpy(leader->ip_address, ip_address, strlen(ip_address));
-  leader->port_num = port_num;
+  leader->port_num = malloc(strlen(port_num));
+  strncpy(leader->port_num, port_num, strlen(port_num));
   leader->is_leader = is_leader;
   
   // initialize list of participants and list of messages
@@ -93,6 +101,7 @@ int start_chat(char *usr) {
   
   printf("MY NICKNAME: %s\n", nickname);
   printf("MY IP ADDRESS: %s\n", ip_address);
+  printf("MY PORT NUM: %s\n", port_num);
   
   return 0;
 }
@@ -130,6 +139,8 @@ int exit_chat() {
   free(participants_head);
   free(messages_head);
   
+  RMP_closeSocket(socket_fd);
+  
   printf("\nYou left the chat.\n");
   
   return 0;
@@ -144,6 +155,7 @@ int empty_lists() {
     if (prev_p) {
       free(prev_p->nickname);
       free(prev_p->ip_address);
+      free(prev_p->port_num);
       free(prev_p);
     }
     TAILQ_REMOVE(participants_head, curr_p, participants);
@@ -152,6 +164,7 @@ int empty_lists() {
   if (prev_p) {
     free(prev_p->nickname);
     free(prev_p->ip_address);
+    free(prev_p->port_num);
     free(prev_p);
   }
 
