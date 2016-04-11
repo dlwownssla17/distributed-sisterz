@@ -187,8 +187,6 @@ int main(int argc, char** argv) {
     printf("Nickname must not contain spaces\n");
     exit(1);
   }
-
-  strcpy(nickname, argv[0]);
     
   // start a new chat group as the leader
   if (argc == 2) {
