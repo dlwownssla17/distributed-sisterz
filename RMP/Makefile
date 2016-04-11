@@ -12,6 +12,9 @@ protocol.o: protocol.c protocol.h
 rmp.o: rmp.c rmp.h protocol.o
 	$(CC) $(CFLAGS) -c rmp.c
 
+test_local: tests/test_local.c librmp.a
+	$(CC) $(CFLAGS) -o $@ $^
+
 test_server: tests/test_server.c librmp.a
 	$(CC) $(CFLAGS) -o $@ $^
 
@@ -21,8 +24,9 @@ test_client: tests/test_client.c librmp.a
 clean:
 	rm -f librmp.a *.o tests/*.o
 
-test: test_server test_client
+test: test_local test_server test_client
 	make clean
+	./test_local
 	./test_server &
 	sleep 1
 	./test_client
