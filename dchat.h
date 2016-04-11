@@ -25,23 +25,12 @@ typedef struct Participant {
   char *nickname;
   char *ip_address;
   char *port_num;
-  int is_leader;
-  // TAILQ_ENTRY(Message) messages;
+  int is_leader; // TODO: is this necessary?
   TAILQ_ENTRY(Participant) participants;
 } Participant;
 
 // list of participants
 typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
-
-// message struct
-typedef struct Message {
-  char *msg;
-  int seq_num;
-  TAILQ_ENTRY(Message) messages;
-} Message;
-
-// list of messages
-typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 
 /* constants */
 
@@ -73,3 +62,9 @@ int chat();
 
 // leave chat (free all relevant data structures)
 int exit_chat();
+
+#ifdef DEBUG
+# define IF_DEBUG(x) x
+#else
+# define IF_DEBUG(x) ((void)0)
+#endif
