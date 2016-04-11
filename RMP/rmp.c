@@ -43,7 +43,7 @@ int RMP_createSocket(rmp_address *address)
 	// Create socket
 	int socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(socket_fd == -1) {
-		perror(NULL);
+		perror("socket failed in RMP_createSocket");
 		return -1;
 	}
 
@@ -51,7 +51,7 @@ int RMP_createSocket(rmp_address *address)
 	int status = bind(socket_fd,
 	                  (struct sockaddr *) address, sizeof(rmp_address));
 	if(status == -1) {
-		perror(NULL);
+		perror("bind failed in RMP_createSocket");
 		return -1;
 	}
 
@@ -60,7 +60,7 @@ int RMP_createSocket(rmp_address *address)
 	status = getsockname(socket_fd,
 	                     (struct sockaddr *) address, &address_size);
 	if(status == -1) {
-		perror(NULL);
+		perror("getsockname failed in RMP_createSocket");
 	}
 
 	return socket_fd;

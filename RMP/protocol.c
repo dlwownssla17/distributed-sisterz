@@ -21,7 +21,6 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
 	size_t header_size = sizeof(struct header);
 	void *send_buffer = malloc(num_bytes + header_size);
 	if(send_buffer == NULL) {
-		perror(NULL);
 		return -1;
 	}
 
@@ -39,7 +38,7 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
 	                            (struct sockaddr *) destination,
 	                            sizeof(struct sockaddr_in));
 	if(num_bytes_sent == -1) {
-		perror(NULL);
+		perror("sendto failed in send_rmp_datagram");
 		free(send_buffer);
 		return -1;
 	}
@@ -59,7 +58,6 @@ int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
 	size_t header_size = sizeof(struct header);
 	void *receive_buffer = malloc(len + header_size);
 	if(receive_buffer == NULL) {
-		perror(NULL);
 		return -1;
 	}
 
@@ -68,7 +66,7 @@ int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
     int bytes_received = recvfrom(socket_fd, receive_buffer, len + header_size, 0,
                                   (struct sockaddr *) src_address, &address_len);
     if(bytes_received == -1) {
-        perror(NULL);
+        perror("recvfrom failed in receive_rmp_datagram");
         free(receive_buffer);
         return -1;
     }
