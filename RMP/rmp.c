@@ -85,10 +85,9 @@ int RMP_listen(int socket_fd, void *buffer, size_t len,
 	// Receive a message
 	struct sockaddr_in internal_src_address;
 	enum message_type type;
-	long int message_id;
+	message_id id;
 	int num_bytes_received = receive_rmp_datagram(socket_fd, &internal_src_address,
-	                                              &type, &message_id,
-	                                              buffer, len);
+	                                              &type, &id, buffer, len);
     if(num_bytes_received == -1) {
         return -1;
     }

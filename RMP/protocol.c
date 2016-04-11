@@ -8,13 +8,13 @@
 
 struct header {
 	enum message_type type;
-	long int id;
+	message_id id;
 };
 
 
 
 int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
-                      enum message_type type, long int id,
+                      enum message_type type, message_id id,
                		  const void *payload, int num_bytes)
 {
 	// Allocate a buffer for [header + payload]
@@ -51,7 +51,7 @@ int send_rmp_datagram(int socket_fd, struct sockaddr_in *destination,
 
 
 int receive_rmp_datagram(int socket_fd, struct sockaddr_in *src_address,
-                         enum message_type *type, long int *id,
+                         enum message_type *type, message_id *id,
 						 void *payload, size_t len)
 {
 	// Allocate a buffer for [header + payload]
