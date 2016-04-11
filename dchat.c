@@ -25,7 +25,7 @@
 char nickname[MAX_NICKNAME_LEN + 1];
 char ip_address[MAX_IP_ADDRESS_LEN + 1];
 char port_num[MAX_PORT_NUM_LEN + 1];
-int clock_num = 0; // only used by the leader
+int clock_num = 0;
 int is_leader = 0;
 Participant *leader;
 
@@ -87,11 +87,11 @@ int start_chat(char *usr) {
   
   // set leader
   leader = malloc(sizeof(Participant));
-  leader->nickname = malloc(strlen(nickname));
+  leader->nickname = malloc(strlen(nickname) + 1);
   strncpy(leader->nickname, nickname, strlen(nickname));
-  leader->ip_address = malloc(strlen(ip_address));
+  leader->ip_address = malloc(strlen(ip_address) + 1);
   strncpy(leader->ip_address, ip_address, strlen(ip_address));
-  leader->port_num = malloc(strlen(port_num));
+  leader->port_num = malloc(strlen(port_num) + 1);
   strncpy(leader->port_num, port_num, strlen(port_num));
   leader->is_leader = is_leader;
   
@@ -105,15 +105,101 @@ int start_chat(char *usr) {
   // update number of participants
   num_participants++;
   
-  IF_DEBUG(printf("MY NICKNAME: %s\n", nickname));
-  IF_DEBUG(printf("MY IP ADDRESS: %s\n", ip_address));
-  IF_DEBUG(printf("MY PORT NUM: %s\n", port_num));
+  printf("%s started a new chat, listening on %s:%s\n", nickname, ip_address, port_num);
   
   return 0;
 }
 
-void process_participant_update (char* command) {
+/**
+ * Takes in a command and updates the participant list, leader, num_participants
+ * @param command The PARTICIPANT_UPDATE command
+ * @param joining If true, prints current participants. Otherwise, prints joining message
+ */
+void process_participant_update (char* command, int joining) {
+  // start by clearing current list
+  empty_list();
 
+  // skip over "PARTICIPANT_UPDATE"
+  char* currPos = strchr(command, "@");
+
+  // skip leading spaces
+  while (currPos[0] == ' ') {
+    currPos++;
+  }
+
+  int is_first = 1;
+
+  char ip_address[MAX_IP_ADDRESS_LEN + 1];
+  char port_num[6];
+  char nickname[MAX_NICKNAME_LEN + 1];
+
+  Participant *new_participant;
+
+  while (currPos[0] != '\0' && currPos[0] != '=') {
+    int scan_ret = sscanf(currPos, "%[^@: ]:%[0-9.]:%[0-9]", nickname, ip_address, port_num);
+    if (scan_ret == EOF) {
+      // EOF or error
+      perror("process_participant_update sscanf");
+      fprintf(stderr, "At: %s\n", recv_buff);
+      exit(1);
+    } else if (scan_ret < 3) {
+      fprintf(stderr, "Invalid participant at: %s\n", recv_buff);
+      exit(1);
+    }
+
+    // create new participant
+    new_participant = malloc(sizeof(Participant));
+    new_participant->nickname = malloc(strlen(nickname) + 1);
+    strncpy(new_participant->nickname, nickname, strlen(nickname));
+    new_participant->ip_address = malloc(strlen(ip_address) + 1);
+    strncpy(new_participant->ip_address, ip_address, strlen(ip_address));
+    new_participant->port_num = malloc(strlen(port_num) + 1);
+    strncpy(new_participant->port_num, port_num, strlen(port_num));
+    new_participant->is_leader = is_first;
+
+    if (is_first) {
+      leader = new_participant;
+    }
+    
+    // add participant to list of participants
+    TAILQ_INSERT_TAIL(participants_head, new_participant, participants);
+
+    num_participants++;
+
+    // print output
+    if (joining) {
+      printf("%s %s:%s%s\n", nickname, ip_address, port_num, is_first ? " (Leader)" : "");
+    }
+
+    // step forward
+    int chars_to_skip = strcspn(currPos, " =");
+
+    currPos += chars_to_skip;
+
+    // skip leading spaces
+    while (currPos[0] == ' ') {
+      currPos++;
+    }
+
+    is_first = 0;
+  }
+  // get payload
+  if (currPos[0] == '=') {
+    currPos++;
+
+    // skip leading spaces
+    while (currPos[0] == ' ') {
+      currPos++;
+    }
+
+    if (!joining) {
+      printf("NOTICE %s\n", currPos);
+    }
+  } else {
+    fprintf(stderr, "Unexpected EOF in parsing PARTICIPANT_UPDATE\n");
+    exit(1);
+  }
+  // check for error case
 }
 
 // join an existing chat group
@@ -145,11 +231,15 @@ int join_chat(char *nickname, char *addr_port) {
   RMP_getAddressFor(ip_address, "0", &rmp_addr);
   socket_fd = RMP_createSocket(&rmp_addr);
   
-  // print port_num
+  // print my port_num
+  char port[6];
   sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
   
-  // set not is_leader
+  // set is_leader to false
   is_leader = 0;
+
+  printf("%s joining a new chat on %s, listening on %s:%s\n", nickname, addr_port,
+    ip_address, port_num);
 
   if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
     fprintf(stderr, "RMP_getAddressFor error\n");
@@ -179,7 +269,9 @@ int join_chat(char *nickname, char *addr_port) {
       participants_head = malloc(sizeof(ParticipantsHead));
       TAILQ_INIT(participants_head);
 
-      // TODO: this case, use same parser from chat() loop
+      printf("Succeeded, current users:\n");
+
+      process_participant_update(recv_buff, 1);
       return 1;
     } else if (strcmp("JOIN_FAILURE", command_type)) {
       // wait 500ms and retry
@@ -188,7 +280,7 @@ int join_chat(char *nickname, char *addr_port) {
       continue;
     } else if (strcmp("LEADER_ID", command_type)) {
       // parse LEADER_ID message
-      if (sscanf(recv_buff, "%s %[0-9.]:%d", command_type, addr, port) == EOF) {
+      if (sscanf(recv_buff, "%s %[0-9.]:%[0-9]", command_type, addr, port) == EOF) {
         // EOF or error
         perror("sscanf");
         fprintf(stderr, "On command: %s\n", recv_buff);
@@ -203,7 +295,7 @@ int join_chat(char *nickname, char *addr_port) {
     }
   }
   
-  fprintf(stderr, "Failed to join chat after %d attempts\n", failed_join_attempts);
+  fprintf(stderr, "Sorry, no chat is active on %d, try again later.\nBye.\n", addr_port);
   exit(1);
 
   return 0;
@@ -256,6 +348,9 @@ int empty_list() {
   // set number of participants back to zero
   num_participants = 0;
 
+  // should have been freed
+  leader = NULL;
+
   return 0;
 }
 
@@ -273,8 +368,8 @@ int main(int argc, char** argv) {
     exit(1);
   }
   // error if spaces or at-symbol in nickname
-  if (strcspn(argv[1], "@ ") < nickname_len) {
-    printf("Nickname must not contain spaces or at-symbol.\n");
+  if (strcspn(argv[1], ":@ ") < nickname_len) {
+    printf("Nickname must not contain spaces, colon, or at-symbol.\n");
     exit(1);
   }
     
