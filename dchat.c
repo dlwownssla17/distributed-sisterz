@@ -137,7 +137,7 @@ void process_participant_update (char* command, int joining) {
   empty_list();
 
   // skip over "PARTICIPANT_UPDATE"
-  char* currPos = strchr(command, '@');
+  char* currPos = strchr(command, '@') + 1;
 
   // skip leading spaces
   while (currPos[0] == ' ') {
@@ -157,10 +157,10 @@ void process_participant_update (char* command, int joining) {
     if (scan_ret == EOF) {
       // EOF or error
       perror("process_participant_update sscanf");
-      fprintf(stderr, "At: %s\n", command);
+      fprintf(stderr, "At: %s\n", currPos);
       exit(1);
     } else if (scan_ret < 3) {
-      fprintf(stderr, "Invalid participant at: %s\n", command);
+      fprintf(stderr, "Invalid participant at: %s\n", currPos);
       exit(1);
     }
 
@@ -220,10 +220,13 @@ void process_participant_update (char* command, int joining) {
 }
 
 // join an existing chat group
-int join_chat(char *nickname, char *addr_port) {
+int join_chat(char *i_nickname, char *addr_port) {
   int failed_join_attempts;
   rmp_address suspected_leader, recv_addr;
   char recv_buff[MAX_BUFFER_LEN];
+
+  // set nickname
+  strncpy(nickname, i_nickname, strlen(i_nickname));
 
   // get own ip address
   set_ip_address(ip_address);
@@ -394,16 +397,17 @@ int chat_non_leader() {
             exit(1);
           }
           // send message
-          else if (num_bytes > 0) {
+          else if (num_bytes > 1) {
             buf[num_bytes - 1] = '\0';
             
             // process message request
             char message_request_buf[16 + MAX_NICKNAME_LEN + 2 + MAX_BUFFER_LEN + 1];
             snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", nickname, buf);
-            
+
             // get rmp_address of leader
             RMP_getAddressFor(leader->ip_address, leader->port_num, &rmp_addr);
-            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, num_bytes)) == -1) {
+            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf,
+                strlen(message_request_buf) + 1)) == -1) {
               printf("chat_non_leader: RMP_sendTo\n");
               exit(1);
             }
@@ -422,8 +426,7 @@ int chat_non_leader() {
             printf("chat_non_leader: RMP_listen\n");
             exit(1);
           }
-          buf[num_bytes - 1] = '\0';
-          
+
           // case match for message type
           char message_type[20];
           char rest_message[MAX_BUFFER_LEN + 1];
@@ -436,7 +439,7 @@ int chat_non_leader() {
             int message_id;
             char sender_nickname[MAX_NICKNAME_LEN + 1];
             char message_payload[MAX_BUFFER_LEN + 1];
-            if (sscanf(rest_message, "%d %s= %[^\n]", message_id, sender_nickname, message_payload) == EOF) {
+            if (sscanf(rest_message, "%d %[^= ]= %[^\n]", &message_id, sender_nickname, message_payload) == EOF) {
               perror("chat_non_leader: sscanf for MESSAGE_BROADCAST");
               exit(1);
             }
@@ -464,14 +467,14 @@ int chat_non_leader() {
             snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s %s", leader->ip_address, leader->port_num);
             
             // send message request
-            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, sizeof(message_request_buf))) == -1) {
+            if ((num_bytes = RMP_sendTo(socket_fd, &rmp_addr, message_request_buf, strlen(message_request_buf) + 1)) == -1) {
               printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
               exit(1);
             }
           }
           // invalid message
           else {
-            printf("chat_non_leader: Invalid message received.\n");
+            printf("chat_non_leader, invalid message received: %s\n", buf);
             exit(1);
           }
         }
@@ -600,9 +603,11 @@ int chat_leader() {
             perror("chat_leader: read");
             exit(1);
           }
-          if (num_bytes > 0) {
+          if (num_bytes > 1) {
+
+            buf[num_bytes - 1] = '\0';
             char message_broadcast[1024];
-            snprintf(message_broadcast, sizeof(1024), "MESSAGE_BROADCAST %d %s= %s",
+            snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
               clock_num++, nickname, buf);
 
             broadcast_message(message_broadcast);
@@ -614,6 +619,8 @@ int chat_leader() {
             printf("chat_leader: RMP_listen\n");
             exit(1);
           }
+
+          buf[num_bytes - 1] = '\0';
 
           // RECEIVE MESSAGE
           char command_type[20];
@@ -631,10 +638,11 @@ int chat_leader() {
             // TODO: fix other strncpy's to have +1
             Participant *new_participant = malloc(sizeof(Participant));
             new_participant->nickname = malloc(strlen(rest_command) + 1);
-            strncpy(new_participant->nickname, rest_command, strlen(nickname + 1));
+            strncpy(new_participant->nickname, rest_command, strlen(nickname) + 1);
             new_participant->ip_address = inet_ntoa(rmp_addr.sin_addr);
             new_participant->port_num = malloc(strlen(port_num) + 1);
-            strncpy(new_participant->port_num, port_num, strlen(port_num + 1));
+            strncpy(new_participant->port_num, port_num, strlen(port_num) + 1);
+
             new_participant->is_leader = 0;
             
             // add participant to list of participants
@@ -650,6 +658,7 @@ int chat_leader() {
             generate_participant_update(participant_update, sizeof(participant_update),
               join_message);
             broadcast_message(participant_update);
+            printf("%s\n", join_message);
           } else if (!strcmp("MESSAGE_REQUEST", command_type)) {
             char sender_nickname[MAX_NICKNAME_LEN];
             char payload[MAX_BUFFER_LEN];
@@ -660,7 +669,7 @@ int chat_leader() {
             }
 
             char message_broadcast[1024];
-            snprintf(message_broadcast, sizeof(1024), "MESSAGE_BROADCAST %d %s= %s",
+            snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
               clock_num++, sender_nickname, payload);
 
             broadcast_message(message_broadcast);
