@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#include <time.h>
 #include "dchat.h"
 #include "RMP/rmp.h"
 
@@ -37,6 +38,8 @@ int num_participants = 0;
 
 rmp_address rmp_addr;
 int socket_fd = 0;
+
+struct timespec JOIN_ATTEMPT_WAIT_TIME = {.tv_sec = 0, .tv_nsec = 5e8};
 
 /* functions */
 
@@ -106,9 +109,9 @@ int start_chat(char *usr) {
   // update number of participants
   num_participants++;
   
-  printf("MY NICKNAME: %s\n", nickname);
-  printf("MY IP ADDRESS: %s\n", ip_address);
-  printf("MY PORT NUM: %s\n", port_num);
+  IF_DEBUG(printf("MY NICKNAME: %s\n", nickname));
+  IF_DEBUG(printf("MY IP ADDRESS: %s\n", ip_address));
+  IF_DEBUG(printf("MY PORT NUM: %s\n", port_num));
   
   return 0;
 }
@@ -156,8 +159,9 @@ int join_chat(char *nickname, char *addr_port) {
   char add_me_cmd[8 + MAX_NICKNAME_LEN];
   snprintf(add_me_cmd, sizeof(add_me_cmd), "ADD_ME %s", nickname);
 
+  // try to join
   for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
-    // ADD_ME
+    // send ADD_ME
     RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1);
     
     // receive response
@@ -165,15 +169,45 @@ int join_chat(char *nickname, char *addr_port) {
 
     // TODO: check that recv_addr equals suspected_leader
     char command_type[20];
-    if (sscanf(recv_buff, "%s ", command_type)) {
+    if (sscanf(recv_buff, "%s ", command_type) == EOF) {
+      // EOF or error
+      perror("sscanf");
+      fprintf(stderr, "On command: %s\n", recv_buff);
+      exit(1);
+    } if (strcmp("PARTICIPANT_UPDATE", command_type)) {
+      // initialize list of participants and list of messages
+      participants_head = malloc(sizeof(ParticipantsHead));
+      TAILQ_INIT(participants_head);
+      messages_head = malloc(sizeof(MessagesHead));
+      TAILQ_INIT(messages_head);
 
+      // TODO: this case, use same parser from chat() loop
+      return 1;
+    } else if (strcmp("JOIN_FAILURE", command_type)) {
+      // wait 500ms and retry
+      IF_DEBUG(printf("Join attempt #%d failed\n", failed_join_attempts + 1));
+      nanosleep(&JOIN_ATTEMPT_WAIT_TIME, NULL);
+      continue;
+    } else if (strcmp("LEADER_ID", command_type)) {
+      // parse LEADER_ID message
+      if (sscanf(recv_buff, "%s %[0-9.]:%d", command_type, addr, port) == EOF) {
+        // EOF or error
+        perror("sscanf");
+        fprintf(stderr, "On command: %s\n", recv_buff);
+        exit(1);
+      }
+      // set new leader
+      RMP_getAddressFor(addr, port, &suspected_leader);
+      IF_DEBUG(printf("Received LEADER_ID and redirecting\n"));
+    } else {
+      fprintf(stderr, "Unexpected command: %s\n", recv_buff);
+      exit(1);
     }
-    if (strcmp("PARTICIPANT_UPDATE", command_type)) {
-      
-    }
-
   }
   
+  fprintf(stderr, "Failed to join chat after %d attempts\n", failed_join_attempts);
+  exit(1);
+
   return 0;
 }
 

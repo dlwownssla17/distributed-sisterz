@@ -68,3 +68,9 @@ int chat();
 
 // leave chat (free all relevant data structures)
 int exit_chat();
+
+#ifdef DEBUG
+# define IF_DEBUG(x) x
+#else
+# define IF_DEBUG(x) ((void)0)
+#endif
