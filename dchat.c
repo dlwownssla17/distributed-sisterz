@@ -21,7 +21,7 @@
 
 /* global variables */
 
-char nickname[MAX_NICKNAME_LEN + 1];
+char nickname[MAX_NICKNAME_LEN];
 char ip_address[MAX_IP_ADDRESS_LEN];
 int port_num = 0;
 int clock_num = 0; // only used by the leader
@@ -180,11 +180,10 @@ int main(int argc, char** argv) {
     printf("Nickname is too long; please keep it under %d characters.\n", MAX_NICKNAME_LEN);
     exit(1);
   }
-
-  // check for spaces in nickname
-  char* space = " ";
-  if (strcspn(argv[0], space) < nickname_len) {
-    printf("Nickname must not contain spaces\n");
+  // error if spaces in nickname
+  char *space = " ";
+  if (strcspn(argv[1], space) < nickname_len) {
+    printf("Nickname must not contain spaces.\n");
     exit(1);
   }
     
