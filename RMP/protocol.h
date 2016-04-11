@@ -1,7 +1,7 @@
 #ifndef __PROTOCOL_H__
 #define __PROTOCOL_H__
 
-enum message_type { DATA, ACK, SYNACK };
+enum message_type { DATA, ACK, SYN_ACK };
 typedef long int message_id;
 
 /*

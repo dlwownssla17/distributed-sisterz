@@ -3,6 +3,8 @@
 
 #include <netinet/in.h>
 
+#define MAX_MESSAGE_SIZE 65000
+
 typedef struct sockaddr_in rmp_address;
 
 /*
