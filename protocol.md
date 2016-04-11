@@ -1,4 +1,5 @@
 # Protocol
+Here are all the possible commands that the chat program could send or receive on top of the RMP protocol.
 
 ## Joining commands
  * `ADD_ME <NICKNAME>`
@@ -16,6 +17,5 @@
  * `ELECTION_STOP` - when a node sees that an election has been started by an "inferior" node
  * `ELECTION_VICTORY <SENDER_NICKNAME>` - user is new leader
 
-## Heartbeats (Optional)
+## Heartbeats (Not implemented)
  * `HEARTBEAT` - from non-leader to leader once every regular interval
- 
