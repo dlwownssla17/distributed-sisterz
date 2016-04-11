@@ -15,6 +15,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ifaddrs.h>
+#include <sys/time.h>
 
 /* structs */
 
@@ -54,6 +56,9 @@ typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
 
 // maximum port num length
 #define MAX_PORT_NUM_LEN 5
+
+// file descriptor for stdin
+#define STDIN 0
 
 /* functions */
 
