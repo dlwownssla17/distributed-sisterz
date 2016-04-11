@@ -40,12 +40,8 @@ int socket_fd = 0;
 
 /* functions */
 
-// start a new chat group as the leader
-int start_chat(char *usr) {
-  // set nickname
-  strncpy(nickname, usr, strlen(usr));
-  
-  // set ip_address
+// set ip address
+int set_ip_address() {
   struct ifaddrs *ifaddr, *tmp;
   if (getifaddrs(&ifaddr) == -1) {
     perror("getifaddrs");
@@ -66,6 +62,17 @@ int start_chat(char *usr) {
     printf("Could not find ip address.\n");
     exit(1);
   }
+  
+  return 0;
+}
+
+// start a new chat group as the leader
+int start_chat(char *usr) {
+  // set nickname
+  strncpy(nickname, usr, strlen(usr));
+  
+  // set ip_address
+  set_ip_address();
   
   // create socket
   RMP_getAddressFor(ip_address, "0", &rmp_addr);
