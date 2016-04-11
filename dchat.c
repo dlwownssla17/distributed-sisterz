@@ -208,9 +208,32 @@ int join_chat(char *nickname, char *addr_port) {
   rmp_address suspected_leader, recv_addr;
   char recv_buff[MAX_BUFFER_LEN];
 
+  // get own ip address
+  set_ip_address(ip_address);
+
+  // create socket
+  if (RMP_getAddressFor(ip_address, "0", &rmp_addr) < 0) {
+    fprintf(stderr, "RMP_getAddressFor 1 error\n");
+    exit(1);
+  }
+
+  if ((socket_fd = RMP_createSocket(&rmp_addr)) < 0) {
+    fprintf(stderr, "RMP_createSocket error\n");
+    exit(1);
+  }
+  
+  // get my port_num
+  sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
+  
+  // set is_leader to false
+  is_leader = 0;
+
+  printf("%s joining a new chat on %s, listening on %s:%s\n", nickname, addr_port,
+    ip_address, port_num);
+
+  // try to set up suspected_leader
   // split addr_port into addr and port
   char addr[MAX_IP_ADDRESS_LEN + 1];
-  char port[6];
 
   int colon_pos = strcspn(addr_port, ":");
 
@@ -222,27 +245,11 @@ int join_chat(char *nickname, char *addr_port) {
   strncpy(addr, addr_port, sizeof(addr));
   addr[colon_pos] = '\0';
 
-  char my_port[6];
-  strncpy(my_port, addr_port + colon_pos + 1, sizeof(my_port));
-
-  // get own ip address
-  set_ip_address(ip_address);
-
-  // create socket
-  RMP_getAddressFor(ip_address, "0", &rmp_addr);
-  socket_fd = RMP_createSocket(&rmp_addr);
-  
-  // print my port_num
-  sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
-  
-  // set is_leader to false
-  is_leader = 0;
-
-  printf("%s joining a new chat on %s, listening on %s:%s\n", nickname, addr_port,
-    ip_address, port_num);
+  char port[6];
+  strncpy(port, addr_port + colon_pos + 1, sizeof(port));
 
   if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
-    fprintf(stderr, "RMP_getAddressFor error\n");
+    fprintf(stderr, "RMP_getAddressFor 2 error\n");
     exit(1);
   }
 
@@ -258,7 +265,10 @@ int join_chat(char *nickname, char *addr_port) {
     }
     
     // receive response
-    RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr);
+    if (RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr) < 0) {
+      fprintf(stderr, "RMP_listen error\n");
+      exit(1);
+    }
 
     // TODO: check that recv_addr equals suspected_leader
     char command_type[20];
@@ -267,7 +277,7 @@ int join_chat(char *nickname, char *addr_port) {
       perror("sscanf");
       fprintf(stderr, "On command: %s\n", recv_buff);
       exit(1);
-    } if (strcmp("PARTICIPANT_UPDATE", command_type)) {
+    } else if (!strcmp("PARTICIPANT_UPDATE", command_type)) {
       // initialize list of participants 
       participants_head = malloc(sizeof(ParticipantsHead));
       TAILQ_INIT(participants_head);
@@ -276,12 +286,14 @@ int join_chat(char *nickname, char *addr_port) {
 
       process_participant_update(recv_buff, 1);
       return 1;
-    } else if (strcmp("JOIN_FAILURE", command_type)) {
+    } else if (!strcmp("JOIN_FAILURE", command_type)) {
       // wait 500ms and retry
       IF_DEBUG(printf("Join attempt #%d failed\n", failed_join_attempts + 1));
+      // TODO: remove
+      printf("FOO\n");
       nanosleep(&JOIN_ATTEMPT_WAIT_TIME, NULL);
       continue;
-    } else if (strcmp("LEADER_ID", command_type)) {
+    } else if (!strcmp("LEADER_ID", command_type)) {
       // parse LEADER_ID message
       if (sscanf(recv_buff, "%s %[0-9.]:%[0-9]", command_type, addr, port) == EOF) {
         // EOF or error
@@ -290,7 +302,10 @@ int join_chat(char *nickname, char *addr_port) {
         exit(1);
       }
       // set new leader
-      RMP_getAddressFor(addr, port, &suspected_leader);
+      if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
+        fprintf(stderr, "RMP_getAddressFor 3 error\n");
+        exit(1);
+      }
       IF_DEBUG(printf("Received LEADER_ID and redirecting\n"));
     } else {
       fprintf(stderr, "Unexpected command: %s\n", recv_buff);
