@@ -263,7 +263,7 @@ int join_chat(char *nickname, char *addr_port) {
       fprintf(stderr, "RMP_sendTo error\n");
       exit(1);
     }
-    
+
     // receive response
     if (RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr) < 0) {
       fprintf(stderr, "RMP_listen error\n");
@@ -289,8 +289,6 @@ int join_chat(char *nickname, char *addr_port) {
     } else if (!strcmp("JOIN_FAILURE", command_type)) {
       // wait 500ms and retry
       IF_DEBUG(printf("Join attempt #%d failed\n", failed_join_attempts + 1));
-      // TODO: remove
-      printf("FOO\n");
       nanosleep(&JOIN_ATTEMPT_WAIT_TIME, NULL);
       continue;
     } else if (!strcmp("LEADER_ID", command_type)) {
