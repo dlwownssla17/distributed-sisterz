@@ -18,7 +18,9 @@ struct message_holding_buffer {
 };
 
 
-
+/*
+ * Maps rmp_addresses to long long integers, for use as keys in a map.
+ */
 long long rmp_address_hash(rmp_address *address)
 {
 	unsigned long ip = address->sin_addr.s_addr;
@@ -31,6 +33,11 @@ long long rmp_address_hash(rmp_address *address)
 
 
 
+/*
+ * Returns a pointer to the current send buffer.
+ * The send buffer holds up to one message that is in the process of being sent.
+ * Allocates the buffer if it does not already exist.
+ */
 struct message_holding_buffer* get_send_buffer()
 {
 	static struct message_holding_buffer *buffer;
@@ -45,6 +52,12 @@ struct message_holding_buffer* get_send_buffer()
 
 
 
+/*
+ * Returns a pointer to the current receive buffer for a given address.
+ * Internally, the receive buffer maps rmp_address's to buffers of up to one
+ * message from that address.
+ * Allocates the buffer if it does not already exist.
+ */
 struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
 {
 	static map *node_to_buffer_map;
@@ -223,6 +236,7 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 		return -1;
 	}
 
+	// Then process incoming messages until an ACK from the recipient is received
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
@@ -261,6 +275,7 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 
 int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address)
 {
+	// Process incoming messages until a receive transaction is completed
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
@@ -274,7 +289,7 @@ int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address
 		}		
 	} while(recv_type != SYN_ACK);
 
-    // Other stuff
+    // Pass back the source address
     if(src_address != NULL) {
 		memcpy(src_address, &recv_src_address, sizeof(rmp_address));
 	}
