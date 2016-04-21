@@ -51,12 +51,6 @@ typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
 
 /* functions */
 
-// start a new chat group as the leader
-int start_chat(char *usr);
-
-// join an existing chat group
-int join_chat(char *usr, char *addr_port);
-
 // chat (until user decides to leave chat or crash)
 int chat();
 
