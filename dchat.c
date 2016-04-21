@@ -71,6 +71,32 @@ int set_ip_address(char* ip_address) {
   return 0;
 }
 
+/* Inserts a participant to the list with the given info
+ * Sets the global leader variable if necessary and increases number of participants
+ */
+void insert_participant(nickname, ip_address, port_num, is_leader) {
+  Participant p = malloc(sizeof(Participant));
+  p->nickname = malloc(MAX_NICKNAME_LEN + 1);
+  strncpy(p->nickname, nickname, MAX_NICKNAME_LEN + 1);
+  p->ip_address = malloc(MAX_IP_ADDRESS_LEN + 1);
+  strncpy(p->ip_address, ip_address, MAX_IP_ADDRESS_LEN + 1);
+  p->port_num = malloc(MAX_PORT_NUM_LEN + 1);
+  strncpy(p->port_num, port_num, MAX_PORT_NUM_LEN + 1);
+  p->is_leader = is_leader;
+  
+  if (is_leader) {
+	  leader = p;
+  }
+  
+  // add participant to list of participants
+  TAILQ_INSERT_TAIL(participants_head, p, participants);
+
+  // update number of participants
+  num_participants++;
+  
+  return p;
+}
+
 // start a new chat group as the leader
 int start_chat() {
   // set ip_address
@@ -92,25 +118,12 @@ int start_chat() {
   // set is_leader
   is_leader = 1;
   
-  // set leader
-  leader = malloc(sizeof(Participant));
-  leader->nickname = malloc(strlen(nickname) + 1);
-  strncpy(leader->nickname, nickname, strlen(nickname));
-  leader->ip_address = malloc(strlen(ip_address) + 1);
-  strncpy(leader->ip_address, ip_address, strlen(ip_address));
-  leader->port_num = malloc(strlen(port_num) + 1);
-  strncpy(leader->port_num, port_num, strlen(port_num));
-  leader->is_leader = is_leader;
-  
   // initialize list of participants
   participants_head = malloc(sizeof(ParticipantsHead));
   TAILQ_INIT(participants_head);
   
-  // add participant (leader) to list of participants
-  TAILQ_INSERT_TAIL(participants_head, leader, participants);
-
-  // update number of participants
-  num_participants++;
+  // set leader
+  insert_participant(nickname, ip_address, port_num, is_leader);
   
   printf("%s started a new chat, listening on %s:%s\n", nickname, ip_address, port_num);
   
@@ -140,8 +153,6 @@ void process_participant_update (char* command, int joining) {
   char port_num[6];
   char nickname[MAX_NICKNAME_LEN + 1];
 
-  Participant *new_participant;
-
   while (currPos[0] != '\0' && currPos[0] != '=') {
     int scan_ret = sscanf(currPos, "%[^@: ]:%[0-9.]:%[0-9]", nickname, ip_address, port_num);
     if (scan_ret == EOF) {
@@ -154,25 +165,9 @@ void process_participant_update (char* command, int joining) {
       exit(1);
     }
 
-    // create new participant
-    new_participant = malloc(sizeof(Participant));
-    new_participant->nickname = malloc(strlen(nickname) + 1);
-    strncpy(new_participant->nickname, nickname, strlen(nickname) + 1);
-    new_participant->ip_address = malloc(strlen(ip_address) + 1);
-    strncpy(new_participant->ip_address, ip_address, strlen(ip_address) + 1);
-    new_participant->port_num = malloc(strlen(port_num) + 1);
-    strncpy(new_participant->port_num, port_num, strlen(port_num)  + 1);
-    new_participant->is_leader = is_first;
-
-    // leader always listed first in participant update
-    if (is_first) {
-      leader = new_participant;
-    }
-    
-    // add participant to list of participants
-    TAILQ_INSERT_TAIL(participants_head, new_participant, participants);
-
-    num_participants++;
+	// add current participant to list
+	// leader always first in list
+	insert_participant(nickname, ip_address, port_num, is_first);
 
     // print this participant
     if (joining) {
@@ -431,20 +426,8 @@ void leader_receive_message(char* buf) {
     // create new participant
     char port_num[6];
     sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
-
-    Participant *new_participant = malloc(sizeof(Participant));
-    new_participant->nickname = malloc(strlen(rest_command) + 1);
-    strncpy(new_participant->nickname, rest_command, strlen(rest_command) + 1);
-    new_participant->ip_address = inet_ntoa(rmp_addr.sin_addr);
-    new_participant->port_num = malloc(strlen(port_num) + 1);
-    strncpy(new_participant->port_num, port_num, strlen(port_num) + 1);
-
-    new_participant->is_leader = 0;
-    
-    // add participant to list of participants
-    TAILQ_INSERT_TAIL(participants_head, new_participant, participants);
-
-    num_participants++;
+	
+	insert_participant(rest_command, inet_ntoa(rmp_addr.sin_addr), port_num, 0);
 
     // send out participant update
     char join_message[MAX_BUFFER_LEN];
