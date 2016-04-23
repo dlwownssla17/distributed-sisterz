@@ -4,6 +4,8 @@
 #include <netinet/in.h>
 
 #define MAX_MESSAGE_SIZE 65000
+#define ACK_TIMEOUT_USEC 20000  // 20 ms
+#define NUM_RETRIES 2
 
 #define RMP_E_TIMEOUT -2
 

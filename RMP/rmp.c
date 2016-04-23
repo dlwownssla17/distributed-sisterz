@@ -4,6 +4,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "protocol.h"
 #include "../structures/map.h"
@@ -16,6 +17,35 @@ struct message_holding_buffer {
 	char *message;
 	size_t message_length;
 };
+
+
+
+int reset_socket_timeout(int socket_fd)
+{
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	return setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+}
+
+
+
+/*
+ * Returns true if the difference between the two time intervals is greater than
+ * the comparison value, representing time in usec.
+ */
+int interval_greater_than_value(struct timeval *first, struct timeval *second, long comparison)
+{
+	struct timeval comparison_tv;
+	comparison_tv.tv_sec = 0;
+	comparison_tv.tv_usec = comparison;
+
+	struct timeval difference;
+	timersub(second, first, &difference);
+
+	return timercmp(&difference, &comparison_tv, >);
+}
+
 
 
 /*
@@ -229,10 +259,20 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	// First set socket receive timeout
 	struct timeval tv;
 	tv.tv_sec = 0;
-	tv.tv_usec = 20000;  // 20ms
+	tv.tv_usec = ACK_TIMEOUT_USEC;
 	int status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
 	if(status == -1) {
 		perror("setsockopt failed to set timeout in RMP_sendTo");
+		return -1;
+	}
+
+	// Then start the message processing timer
+	struct timeval start_time, current_time;
+	status = gettimeofday(&start_time, NULL);
+	if(status == -1) {
+		perror("gettimeofday failed in RMP_sendTo");
+		reset_socket_timeout(socket_fd);
+		outgoing_buffer->occupied = 0;
 		return -1;
 	}
 
@@ -242,15 +282,27 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	message_id recv_id;
 	char *result_buffer = (char *) malloc(MAX_MESSAGE_SIZE * sizeof(char *));
 	do {
+		status = gettimeofday(&current_time, NULL);
+		if(status == -1) {
+			perror("gettimeofday failed in RMP_sendTo");
+			reset_socket_timeout(socket_fd);
+			outgoing_buffer->occupied = 0;
+			return -1;
+		}
+		if(interval_greater_than_value(&start_time, &current_time, ACK_TIMEOUT_USEC)) {
+			free(result_buffer);
+			reset_socket_timeout(socket_fd);
+			outgoing_buffer->occupied = 0;
+			return -2;
+		}
+
 		status = receive_and_process_message(socket_fd, &recv_src_address,
 	                                &recv_type, &recv_id,
 	                                result_buffer, MAX_MESSAGE_SIZE);
-		if(status < 0) {
+		if(status == -1) {
 			free(result_buffer);
-			// Reset socket receive timeout
-			tv.tv_sec = 0;
-			tv.tv_usec = 0;
-			setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+			reset_socket_timeout(socket_fd);
+			outgoing_buffer->occupied = 0;
 			return status;
 		}		
 	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
@@ -259,15 +311,14 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 
 	free(result_buffer);
 
-	// Reset socket receive timeout
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	status = reset_socket_timeout(socket_fd);
 	if(status == -1) {
 		perror("setsockopt failed to reset timeout in RMP_sendTo");
+		outgoing_buffer->occupied = 0;
 		return -1;
 	}
 
+	outgoing_buffer->occupied = 0;
 	return num_bytes_sent;
 }
 
