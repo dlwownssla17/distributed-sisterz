@@ -6,17 +6,9 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "message_buffers.h"
 #include "protocol.h"
-#include "../structures/map.h"
 #include "rmp.h"
-
-struct message_holding_buffer {
-	int occupied;
-	enum message_type type;
-	message_id id;
-	char *message;
-	size_t message_length;
-};
 
 
 
@@ -46,66 +38,6 @@ int interval_greater_than_value(struct timeval *first, struct timeval *second, l
 	return timercmp(&difference, &comparison_tv, >);
 }
 
-
-
-/*
- * Maps rmp_addresses to long long integers, for use as keys in a map.
- */
-long long rmp_address_hash(rmp_address *address)
-{
-	unsigned long ip = address->sin_addr.s_addr;
-	unsigned short port = address->sin_port;
-	long long output = 0;
-	memcpy(&output, &ip, sizeof(unsigned long));
-	memcpy((&output) + sizeof(unsigned long), &port, sizeof(unsigned short));
-	return output;
-}
-
-
-
-/*
- * Returns a pointer to the current send buffer.
- * The send buffer holds up to one message that is in the process of being sent.
- * Allocates the buffer if it does not already exist.
- */
-struct message_holding_buffer* get_send_buffer()
-{
-	static struct message_holding_buffer *buffer;
-	if(buffer == NULL) {
-		buffer = (struct message_holding_buffer *) malloc(sizeof(struct message_holding_buffer));
-		if(buffer != NULL) {
-			buffer->occupied = 0;
-		}
-	}
-	return buffer;
-}
-
-
-
-/*
- * Returns a pointer to the current receive buffer for a given address.
- * Internally, the receive buffer maps rmp_address's to buffers of up to one
- * message from that address.
- * Allocates the buffer if it does not already exist.
- */
-struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
-{
-	static map *node_to_buffer_map;
-	if(node_to_buffer_map == NULL) {
-		node_to_buffer_map = map_new();
-	}
-
-	long long key = rmp_address_hash(src_address);
-	struct message_holding_buffer *message_buffer = map_get(node_to_buffer_map, key);
-	if(message_buffer == NULL) {
-		message_buffer = malloc(sizeof(struct message_holding_buffer));
-		if(message_buffer != NULL) {
-			message_buffer->occupied = 0;
-			map_put(node_to_buffer_map, key, message_buffer);
-		}
-	}
-	return message_buffer;
-}
 
 
 /*

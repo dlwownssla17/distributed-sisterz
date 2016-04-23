@@ -1,6 +1,8 @@
 #ifndef __PROTOCOL_H__
 #define __PROTOCOL_H__
 
+#include <arpa/inet.h>
+
 enum message_type { DATA, ACK, SYN_ACK };
 typedef long int message_id;
 
