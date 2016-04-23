@@ -74,8 +74,8 @@ int set_ip_address(char* ip_address) {
 /* Inserts a participant to the list with the given info
  * Sets the global leader variable if necessary and increases number of participants
  */
-void insert_participant(nickname, ip_address, port_num, is_leader) {
-  Participant p = malloc(sizeof(Participant));
+void insert_participant(char* nickname, char* ip_address, char* port_num, int is_leader) {
+  Participant* p = malloc(sizeof(Participant));
   p->nickname = malloc(MAX_NICKNAME_LEN + 1);
   strncpy(p->nickname, nickname, MAX_NICKNAME_LEN + 1);
   p->ip_address = malloc(MAX_IP_ADDRESS_LEN + 1);
@@ -85,7 +85,7 @@ void insert_participant(nickname, ip_address, port_num, is_leader) {
   p->is_leader = is_leader;
   
   if (is_leader) {
-	  leader = p;
+    leader = p;
   }
   
   // add participant to list of participants
@@ -93,8 +93,6 @@ void insert_participant(nickname, ip_address, port_num, is_leader) {
 
   // update number of participants
   num_participants++;
-  
-  return p;
 }
 
 // start a new chat group as the leader
@@ -165,9 +163,9 @@ void process_participant_update (char* command, int joining) {
       exit(1);
     }
 
-	// add current participant to list
-	// leader always first in list
-	insert_participant(nickname, ip_address, port_num, is_first);
+    // add current participant to list
+    // leader always first in list
+    insert_participant(nickname, ip_address, port_num, is_first);
 
     // print this participant
     if (joining) {
@@ -186,6 +184,11 @@ void process_participant_update (char* command, int joining) {
 
     is_first = 0;
   }
+
+  if (joining) {
+    printf("\n");
+  }
+
   // get payload
   if (currPos[0] == '=') {
     currPos++;
@@ -403,11 +406,11 @@ void broadcast_message(char* message) {
     char leave_message[1024];
 
     // get rid of last comma
-    update_buff[update_buff_pos - 2] = ' ';
-    update_buff[update_buff_pos - 1] = '\0';
-    snprintf(leave_message, 1024, "%s left the chat or crashed", update_buff);
+    update_buff[update_buff_pos - 2] = '\0';
+    snprintf(leave_message, 1024, "NOTICE %s left the chat or crashed", update_buff);
     generate_participant_update(update_command, sizeof(update_command), leave_message);
     broadcast_message(update_command);
+    printf("%s\n", leave_message);
   }
 }
 
@@ -426,13 +429,15 @@ void leader_receive_message(char* buf) {
     // create new participant
     char port_num[6];
     sprintf(port_num, "%d", RMP_getPortFrom(&rmp_addr));
-	
-	insert_participant(rest_command, inet_ntoa(rmp_addr.sin_addr), port_num, 0);
+
+    char* ip_address = inet_ntoa(rmp_addr.sin_addr);
+
+    insert_participant(rest_command, ip_address, port_num, 0);
 
     // send out participant update
     char join_message[MAX_BUFFER_LEN];
-    snprintf(join_message, sizeof(join_message), "%s has joined on %s:%s",
-      rest_command, new_participant->ip_address, new_participant->port_num);
+    snprintf(join_message, sizeof(join_message), "NOTICE %s joined on %s:%s",
+      rest_command, ip_address, port_num);
     char participant_update[MAX_BUFFER_LEN];
     generate_participant_update(participant_update, sizeof(participant_update),
       join_message);

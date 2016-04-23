@@ -94,3 +94,6 @@ Temporary Items
 # sftp configuration file
 sftp-config.json
 
+# java gui stuff
+gui/.*
+gui/bin
