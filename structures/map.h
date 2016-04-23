@@ -32,4 +32,9 @@ void* map_get(map *m, long long key);
  */
 void* map_remove(map *m, long long key);
 
+/*
+ * Returns the number of pairs in the map.
+ */
+int map_size(map *m);
+
 #endif

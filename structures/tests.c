@@ -28,6 +28,7 @@ void test_remove_fails()
 	map *m = map_new();
 	void *result = map_remove(m, 1);
 	assert(result == NULL, "remove on a missing key should return NULL");
+	assert(map_size(m) == 0, "remove on a missing key shouldn't change the map size");
 	map_free(m);
 }
 
@@ -37,11 +38,15 @@ void test_put_and_get()
 
 	map *m = map_new();
 
+	assert(map_size(m) == 0, "a new map should have size 0");
+
 	int put_result = map_put(m, 1, payload);
 	assert(put_result == 0, "put should always succeed");
 
 	void *result = map_get(m, 1);
 	assert(result == payload, "get should return what put inserted");
+
+	assert(map_size(m) == 1, "adding an element should increase the size");
 
 	map_remove(m, 1);
 	map_free(m);
@@ -59,6 +64,8 @@ void test_put_and_remove()
 	void *result = map_remove(m, 1);
 	assert(result == payload, "remove should return what put inserted");
 
+	assert(map_size(m) == 0, "removing an element should decrease the size");
+
 	map_free(m);	
 }
 
@@ -70,6 +77,8 @@ void test_put_updates()
 	map *m = map_new();
 	map_put(m, 1, payload);
 	map_put(m, 1, payload2);
+
+	assert(map_size(m) == 1, "updating an element shouldn't change the size");
 
 	void *result = map_remove(m, 1);
 	assert(result == payload2, "remove should return what put inserted (tpu)");

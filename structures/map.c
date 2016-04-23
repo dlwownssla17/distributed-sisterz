@@ -12,6 +12,7 @@ LIST_HEAD(pair_list_head, map_pair);
 
 struct map {
 	struct pair_list_head pairs;
+	int size;
 };
 
 
@@ -34,6 +35,7 @@ map* map_new()
 	map *m = (map *) malloc(sizeof(map));
 	if(m != NULL) {
 		LIST_INIT(&(m->pairs));
+		m->size = 0;
 	}
 	return m;
 }
@@ -65,6 +67,8 @@ int map_put(map *m, long long key, void *value)
 	new_pair->value = value;
 	LIST_INSERT_HEAD(&(m->pairs), new_pair, entries);
 
+	m->size++;
+
 	return 0;
 }
 
@@ -92,5 +96,15 @@ void* map_remove(map *m, long long key)
 	LIST_REMOVE(target_pair, entries);
 	void *value = target_pair->value;
 	free(target_pair);
+
+	m->size--;
+
 	return value;
+}
+
+
+
+int map_size(map *m)
+{
+	return m->size;
 }
