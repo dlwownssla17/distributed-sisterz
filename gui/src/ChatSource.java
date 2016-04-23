@@ -44,6 +44,7 @@ public abstract class ChatSource {
 					if (leader == null) {
 						leader = parts[0];
 					}
+					notice.append(userLine).append(NEWLINE);
 				}
 			}
 			if (userLine == null) {
@@ -86,6 +87,14 @@ public abstract class ChatSource {
 		
 		if (line.equals("Bye.")) {
 			view.makeInactive();
+			return true;
+		}
+		
+		if (line.indexOf(" started a new chat, listening on ") > 0) {
+			// message when a leader first starts a new chat
+			String nickname = line.split(" ")[0];
+			view.initAsLeader(nickname);
+			view.displayNotice(line);
 			return true;
 		}
 		

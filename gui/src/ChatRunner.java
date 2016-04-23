@@ -181,4 +181,9 @@ public class ChatRunner {
 	public void makeInactive() {
 		chatEntry.setEnabled(false);
 	}
+
+	public void initAsLeader(String nickname) {
+		participantsModel.addParticipant(nickname);
+		participantsModel.setLeader(nickname);
+	}
 }

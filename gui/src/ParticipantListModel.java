@@ -31,17 +31,20 @@ public class ParticipantListModel extends AbstractListModel<String> {
 	}
 	
 	@Override
-	public String getElementAt(int index) {
+	public synchronized String getElementAt(int index) {
+		if (index >= participants.size()) {
+			return null;
+		}
 		String participant = sortedParticipants.get(index);
 		return participant + (leader.equals(participant) ? " (leader)" : "");
 	}
 
 	@Override
-	public int getSize() {
+	public synchronized int getSize() {
 		return participants.size();
 	}
 
-	public void setParticipants(String[] participantsList, String leader) {
+	public synchronized void setParticipants(String[] participantsList, String leader) {
 		participants.clear();
 		for (String p: participantsList) {
 			participants.add(p);
@@ -60,7 +63,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 		fireContentsChanged(this, 0, getSize() - 1);
 	}
 	
-	public void addParticipant(String participant) {
+	public synchronized void addParticipant(String participant) {
 		if (!participants.contains(participant)) {
 			participants.add(participant);
 			sortedParticipants.add(participant);
@@ -69,7 +72,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 		}
 	}
 	
-	public void removeParticipant(String participant) {
+	public synchronized void removeParticipant(String participant) {
 		if (participants.contains(participant)) {
 			if (participant.equals(leader)) {
 				throw new IllegalArgumentException("Cannot remove leader");
@@ -80,7 +83,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 		}
 	}
 	
-	public void setLeader(String newLeader) {
+	public synchronized void setLeader(String newLeader) {
 		if (participants.contains(newLeader)) {
 			leader = newLeader;
 			int leaderIndex = sortedParticipants.indexOf(newLeader);
