@@ -25,7 +25,8 @@ int main()
 	int buffer_size = 128;
 	char buffer[buffer_size];
 	rmp_address src_address;
-	int num_bytes_received = RMP_listen(my_socket, buffer, buffer_size, &src_address);
+	int num_bytes_received;
+	while((num_bytes_received = RMP_listen(my_socket, buffer, buffer_size, &src_address)) == 0);
 	assert(num_bytes_received == sizeof(MESSAGE), "RMP_listen didn't return the expected number of bytes");
 	assert(strncmp(buffer, MESSAGE, sizeof(MESSAGE)) == 0, "RMP_listen didn't get the right message.");
 
@@ -34,7 +35,7 @@ int main()
 	assert(bytes_sent == sizeof(MESSAGE2), "RMP_sendTo sent the wrong number of bytes");
 
 	// Receive second message
-	num_bytes_received = RMP_listen(my_socket, buffer, buffer_size, &src_address);
+	while((num_bytes_received = RMP_listen(my_socket, buffer, buffer_size, &src_address)) == 0);
 	assert(num_bytes_received == sizeof(MESSAGE3), "RMP_listen didn't return the expected number of bytes for MESSAGE3");
 	assert(strncmp(buffer, MESSAGE3, sizeof(MESSAGE3)) == 0, "RMP_listen didn't get the right message for MESSAGE3.");
 

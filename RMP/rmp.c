@@ -315,26 +315,27 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 
 int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address)
 {
-	// Process incoming messages until a receive transaction is completed
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
-	int num_bytes_received;
-	do {
-		num_bytes_received = receive_and_process_message(socket_fd, &recv_src_address,
-	                                			 			 &recv_type, &recv_id,
-	                                			 			 buffer, len);
-		if(num_bytes_received < 0) {
-			return num_bytes_received;
-		}		
-	} while(recv_type != SYN_ACK);
+	int num_bytes_received = receive_and_process_message(socket_fd, &recv_src_address,
+	                                			 		 &recv_type, &recv_id,
+	                                			 		 buffer, len);
+	if(num_bytes_received < 0) {
+		// Error
+		return num_bytes_received;
+	} else if(recv_type == SYN_ACK) {
+		// A message transaction was completed
+	    // Pass back the source address
+	    if(src_address != NULL) {
+			memcpy(src_address, &recv_src_address, sizeof(rmp_address));
+		}
 
-    // Pass back the source address
-    if(src_address != NULL) {
-		memcpy(src_address, &recv_src_address, sizeof(rmp_address));
+	    return num_bytes_received;	
+	} else {
+		// False alarm - just meta traffic
+		return 0;
 	}
-
-    return num_bytes_received;
 }
 
 

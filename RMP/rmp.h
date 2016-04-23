@@ -48,6 +48,7 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
  * of it in the given buffer. Also places the sender's address in *src_addr if
  * it is non-null.
  * Returns the number of bytes received or ­-1 on error.
+ * May return 0, in which case no message is returned but no error occurred.
  */
 int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address);
 
