@@ -517,7 +517,7 @@ int chat() {
   
   // add socket fd and stdin fd to all_fds fd set and update current max fd
   FD_SET(socket_fd, &all_fds);
-  FD_SET(STDIN, &all_fds);
+  FD_SET(STDIN_FILENO, &all_fds);
   
   while (1) {
     // update read_fds to all_fds
@@ -531,9 +531,9 @@ int chat() {
 
     char buf[MAX_BUFFER_LEN];
 
-    if (FD_ISSET(STDIN, &read_fds)) {
+    if (FD_ISSET(STDIN_FILENO, &read_fds)) {
       // read from std in
-      int num_bytes = read(STDIN, buf, MAX_BUFFER_LEN);
+      int num_bytes = read(STDIN_FILENO, buf, MAX_BUFFER_LEN);
 
       if (num_bytes > 1) {
         buf[num_bytes - 1] = '\0';
