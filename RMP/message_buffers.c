@@ -34,12 +34,21 @@ struct message_holding_buffer* get_send_buffer()
 
 
 
-struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
+struct map* get_receive_buffer()
 {
 	static map *node_to_buffer_map;
 	if(node_to_buffer_map == NULL) {
 		node_to_buffer_map = map_new();
 	}
+
+	return node_to_buffer_map;
+}
+
+
+
+struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
+{
+	map *node_to_buffer_map = get_receive_buffer();
 
 	long long key = rmp_address_hash(src_address);
 	struct message_holding_buffer *message_buffer = map_get(node_to_buffer_map, key);
@@ -51,4 +60,26 @@ struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
 		}
 	}
 	return message_buffer;
+}
+
+
+
+int iterate_over_send_buffer(int socket_fd, iterator_function target_function)
+{
+	map *node_to_buffer_map = get_receive_buffer();
+
+	map_iterator *iterator = map_iterator_new(node_to_buffer_map);
+	if(iterator == NULL) {
+		return -1;
+	}
+
+	void *current_value = map_iterator_next(iterator, NULL);
+	while(current_value != NULL) {
+		if(target_function(socket_fd, current_value) != 0) {
+			map_iterator_remove(iterator);
+		}
+		current_value = map_iterator_next(iterator, NULL);
+	}
+
+	return 0;
 }
