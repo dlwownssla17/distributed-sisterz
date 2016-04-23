@@ -237,22 +237,15 @@ int RMP_createSocket(rmp_address *address)
 
 
 
-int RMP_sendTo(int socket_fd, rmp_address *destination,
-               const void *buffer, int num_bytes)
+int sendTo(int socket_fd, rmp_address *destination, int num_retries)
 {
 	// Send data message
-	message_id new_id = random();
-	enum message_type type = DATA;
-	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
-	                                       type, new_id,
-               		 					   buffer, num_bytes);
-
 	struct message_holding_buffer* outgoing_buffer = get_send_buffer();
-	outgoing_buffer->occupied = 1;
-	outgoing_buffer->type = type;
-	outgoing_buffer->id = new_id;
-	outgoing_buffer->message = (void *)buffer;
-	outgoing_buffer->message_length = num_bytes;
+	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
+	                                       outgoing_buffer->type,
+	                                       outgoing_buffer->id,
+               		 					   outgoing_buffer->message,
+               		 					   outgoing_buffer->message_length);
 
 	// Wait for ACK
 
@@ -262,7 +255,7 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	tv.tv_usec = ACK_TIMEOUT_USEC;
 	int status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
 	if(status == -1) {
-		perror("setsockopt failed to set timeout in RMP_sendTo");
+		perror("setsockopt failed to set timeout in sendTo");
 		return -1;
 	}
 
@@ -270,7 +263,7 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	struct timeval start_time, current_time;
 	status = gettimeofday(&start_time, NULL);
 	if(status == -1) {
-		perror("gettimeofday failed in RMP_sendTo");
+		perror("gettimeofday failed in sendTo");
 		reset_socket_timeout(socket_fd);
 		outgoing_buffer->occupied = 0;
 		return -1;
@@ -284,16 +277,21 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	do {
 		status = gettimeofday(&current_time, NULL);
 		if(status == -1) {
-			perror("gettimeofday failed in RMP_sendTo");
+			perror("gettimeofday failed in sendTo");
 			reset_socket_timeout(socket_fd);
 			outgoing_buffer->occupied = 0;
 			return -1;
 		}
 		if(interval_greater_than_value(&start_time, &current_time, ACK_TIMEOUT_USEC)) {
+			// Timeout
 			free(result_buffer);
 			reset_socket_timeout(socket_fd);
-			outgoing_buffer->occupied = 0;
-			return -2;
+			if(num_retries == 0) {
+				outgoing_buffer->occupied = 0;
+				return -2;
+			} else {
+				return sendTo(socket_fd, destination, num_retries - 1);
+			}
 		}
 
 		status = receive_and_process_message(socket_fd, &recv_src_address,
@@ -307,19 +305,38 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 		}		
 	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
 	        recv_type != ACK ||
-	        recv_id != new_id);
+	        recv_id != outgoing_buffer->id);
 
 	free(result_buffer);
 
 	status = reset_socket_timeout(socket_fd);
 	if(status == -1) {
-		perror("setsockopt failed to reset timeout in RMP_sendTo");
+		perror("setsockopt failed to reset timeout in sendTo");
 		outgoing_buffer->occupied = 0;
 		return -1;
 	}
 
 	outgoing_buffer->occupied = 0;
 	return num_bytes_sent;
+}
+
+
+
+int RMP_sendTo(int socket_fd, rmp_address *destination,
+               const void *buffer, int num_bytes)
+{
+	// Send data message
+	message_id new_id = random();
+	enum message_type type = DATA;
+
+	struct message_holding_buffer* outgoing_buffer = get_send_buffer();
+	outgoing_buffer->occupied = 1;
+	outgoing_buffer->type = type;
+	outgoing_buffer->id = new_id;
+	outgoing_buffer->message = (void *)buffer;
+	outgoing_buffer->message_length = num_bytes;
+
+	return sendTo(socket_fd, destination, NUM_RETRIES);
 }
 
 
