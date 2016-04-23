@@ -103,8 +103,9 @@ public abstract class ChatSource {
 		return true;
 	}
 
-	public void run() {
-		// TODO Auto-generated method stub
-		
-	}
+	/**
+	 * This method should be called when the ChatRunner is ready to start receiving
+	 * calls, i.e. its GUI is set up.
+	 */
+	public abstract void run();
 }

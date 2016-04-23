@@ -29,7 +29,6 @@ int clock_num = 0;
 int is_leader = 0;
 Participant *leader;
 
-Participant *p;
 ParticipantsHead *participants_head;
 
 int num_participants = 0;
@@ -337,7 +336,7 @@ void generate_participant_update(char* command_buff, int buff_len, char* join_le
   command_buff += snprintf(command_buff, buff_len, "PARTICIPANT_UPDATE @%s:%s:%s ",
     leader->nickname, leader->ip_address, leader->port_num);
 
-  Participant *curr_p = p;
+  Participant *curr_p;
 
   TAILQ_FOREACH(curr_p, participants_head, participants) {
     if (!curr_p->is_leader) {
@@ -350,7 +349,7 @@ void generate_participant_update(char* command_buff, int buff_len, char* join_le
 }
 
 void broadcast_message(char* message) {
-  Participant *curr_p = p;
+  Participant *curr_p;
   Participant *prev_p = NULL;
   int remove_next = 0;
 
@@ -613,7 +612,7 @@ int exit_chat() {
 // empty list of participants
 int empty_list() {
   // remove all participants
-  Participant *curr_p = p;
+  Participant *curr_p;
   Participant *prev_p = NULL;
   TAILQ_FOREACH(curr_p, participants_head, participants) {
     if (prev_p) {
