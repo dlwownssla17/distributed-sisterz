@@ -10,7 +10,14 @@ me_a_sandwich : dchat
 
 # dchat program
 
-dchat : dchat.o
+dchat : dchat.o RMP/librmp.a
+	$(CC) -o $@ $^
+
+dchat.o : dchat.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+RMP/librmp.a : 
+	cd RMP && make
 
 # generic commands
 
@@ -24,3 +31,8 @@ dchat : dchat.o
 
 clean :
 	rm -rf $(EXEC) $(OBJS)
+	cd RMP && make clean
+
+# check for todos
+todo:
+	! grep -n -H --color=always "//\s*TODO" *.c *.h

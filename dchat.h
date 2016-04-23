@@ -15,6 +15,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ifaddrs.h>
+#include <sys/time.h>
 
 /* structs */
 
@@ -22,44 +24,41 @@
 typedef struct Participant {
   char *nickname;
   char *ip_address;
-  int port_num;
-  int is_leader;
-  struct Participant *leader;
-  // TAILQ_ENTRY(Message) messages;
+  char *port_num;
+  int is_leader; // TODO: is this necessary?
   TAILQ_ENTRY(Participant) participants;
 } Participant;
 
 // list of participants
 typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
 
-// message struct
-typedef struct Message {
-  char *msg;
-  int seq_num;
-  TAILQ_ENTRY(Message) messages;
-} Message;
-
-// list of messages
-typedef TAILQ_HEAD(MessagesHead, Message) MessagesHead;
-
 /* constants */
 
 // maximum buffer length
-#define MAX_BUFFER_LEN 128
+#define MAX_BUFFER_LEN 1024
 
-// maximum ip address length
-#define MAX_IP_ADDRESS_LEN 39
+// maximum nickname length
+#define MAX_NICKNAME_LEN 20
+
+// maximum ip address length (IPv4)
+#define MAX_IP_ADDRESS_LEN 15
+
+// maximum port num length
+#define MAX_PORT_NUM_LEN 5
+
+// file descriptor for stdin
+#define STDIN 0
 
 /* functions */
-
-// start a new chat group as the leader
-int start_chat(char *usr);
-
-// join an existing chat group
-int join_chat(char *usr, char *addr_port);
 
 // chat (until user decides to leave chat or crash)
 int chat();
 
 // leave chat (free all relevant data structures)
 int exit_chat();
+
+#ifdef DEBUG
+# define IF_DEBUG(x) x
+#else
+# define IF_DEBUG(x) ((void)0)
+#endif
