@@ -70,6 +70,37 @@ int set_ip_address(char* ip_address) {
   return 0;
 }
 
+// empty list of participants
+int empty_list() {
+  // remove all participants
+  Participant *curr_p;
+  Participant *prev_p = NULL;
+  TAILQ_FOREACH(curr_p, participants_head, participants) {
+    if (prev_p) {
+      free(prev_p->nickname);
+      free(prev_p->ip_address);
+      free(prev_p->port_num);
+      free(prev_p);
+    }
+    TAILQ_REMOVE(participants_head, curr_p, participants);
+    prev_p = curr_p;
+  }
+  if (prev_p) {
+    free(prev_p->nickname);
+    free(prev_p->ip_address);
+    free(prev_p->port_num);
+    free(prev_p);
+  }
+
+  // set number of participants back to zero
+  num_participants = 0;
+
+  // should have been freed
+  leader = NULL;
+
+  return 0;
+}
+
 /* Inserts a participant to the list with the given info
  * Sets the global leader variable if necessary and increases number of participants
  */
@@ -319,7 +350,7 @@ int join_chat(char *addr_port) {
     }
   }
   
-  fprintf(stderr, "Sorry, no chat is active on %d, try again later.\nBye.\n", addr_port);
+  fprintf(stderr, "Sorry, no chat is active on %s, try again later.\nBye.\n", addr_port);
   exit(1);
 
   return 0;
@@ -516,7 +547,7 @@ int chat() {
   
   // add socket fd and stdin fd to all_fds fd set and update current max fd
   FD_SET(socket_fd, &all_fds);
-  FD_SET(STDIN, &all_fds);
+  FD_SET(STDIN_FILENO, &all_fds);
   
   while (1) {
     // update read_fds to all_fds
@@ -530,9 +561,9 @@ int chat() {
 
     char buf[MAX_BUFFER_LEN];
 
-    if (FD_ISSET(STDIN, &read_fds)) {
+    if (FD_ISSET(STDIN_FILENO, &read_fds)) {
       // read from std in
-      int num_bytes = read(STDIN, buf, MAX_BUFFER_LEN);
+      int num_bytes = read(STDIN_FILENO, buf, MAX_BUFFER_LEN);
 
       if (num_bytes > 1) {
         buf[num_bytes - 1] = '\0';
@@ -606,37 +637,6 @@ int exit_chat() {
   
   printf("\nYou left the chat.\n");
   
-  return 0;
-}
-
-// empty list of participants
-int empty_list() {
-  // remove all participants
-  Participant *curr_p;
-  Participant *prev_p = NULL;
-  TAILQ_FOREACH(curr_p, participants_head, participants) {
-    if (prev_p) {
-      free(prev_p->nickname);
-      free(prev_p->ip_address);
-      free(prev_p->port_num);
-      free(prev_p);
-    }
-    TAILQ_REMOVE(participants_head, curr_p, participants);
-    prev_p = curr_p;
-  }
-  if (prev_p) {
-    free(prev_p->nickname);
-    free(prev_p->ip_address);
-    free(prev_p->port_num);
-    free(prev_p);
-  }
-
-  // set number of participants back to zero
-  num_participants = 0;
-
-  // should have been freed
-  leader = NULL;
-
   return 0;
 }
 

@@ -46,9 +46,6 @@ typedef TAILQ_HEAD(ParticipantsHead, Participant) ParticipantsHead;
 // maximum port num length
 #define MAX_PORT_NUM_LEN 5
 
-// file descriptor for stdin
-#define STDIN 0
-
 /* functions */
 
 // chat (until user decides to leave chat or crash)
