@@ -2,8 +2,8 @@
 
 OBJS = *.o
 EXEC = dchat
-CFLAGS = -g
-CC = cc
+CFLAGS = -g -Wall
+CC = clang
 DEPS = dchat.h RMP/rmp.h
 
 me_a_sandwich : dchat

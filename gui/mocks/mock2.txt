@@ -1,0 +1,7 @@
+jj joining a new chat on 158.130.24.209:47531, listening on 158.130.24.209:49965
+Succeeded, current users:
+fooziedog 158.130.24.209:47531 (Leader)
+jj 158.130.24.209:49965
+
+jj:: hey
+fooziedog:: foo

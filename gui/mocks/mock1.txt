@@ -1,0 +1,6 @@
+fooziedog started a new chat, listening on 158.130.24.209:47531
+NOTICE jj joined on 158.130.24.209:49965
+jj:: hey
+fooziedog:: foo
+NOTICE jj left the chat or crashed
+fooziedog:: yo
