@@ -50,6 +50,13 @@ map* map_new()
 
 void map_free(map *m)
 {
+	struct map_pair *current = LIST_FIRST(&(m->pairs));
+	struct map_pair *next;
+    while(current != NULL) {
+    	next = LIST_NEXT(current, entries);
+        free(current);
+        current = next;
+    }
 	free(m);
 }
 

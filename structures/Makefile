@@ -13,4 +13,4 @@ clean:
 	rm -f *.o
 
 test: tests
-	valgrind ./tests
+	valgrind --leak-check=full ./tests
