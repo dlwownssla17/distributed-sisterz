@@ -4,6 +4,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "protocol.h"
 #include "../structures/map.h"
@@ -19,6 +20,37 @@ struct message_holding_buffer {
 
 
 
+int reset_socket_timeout(int socket_fd)
+{
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	return setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+}
+
+
+
+/*
+ * Returns true if the difference between the two time intervals is greater than
+ * the comparison value, representing time in usec.
+ */
+int interval_greater_than_value(struct timeval *first, struct timeval *second, long comparison)
+{
+	struct timeval comparison_tv;
+	comparison_tv.tv_sec = 0;
+	comparison_tv.tv_usec = comparison;
+
+	struct timeval difference;
+	timersub(second, first, &difference);
+
+	return timercmp(&difference, &comparison_tv, >);
+}
+
+
+
+/*
+ * Maps rmp_addresses to long long integers, for use as keys in a map.
+ */
 long long rmp_address_hash(rmp_address *address)
 {
 	unsigned long ip = address->sin_addr.s_addr;
@@ -31,6 +63,11 @@ long long rmp_address_hash(rmp_address *address)
 
 
 
+/*
+ * Returns a pointer to the current send buffer.
+ * The send buffer holds up to one message that is in the process of being sent.
+ * Allocates the buffer if it does not already exist.
+ */
 struct message_holding_buffer* get_send_buffer()
 {
 	static struct message_holding_buffer *buffer;
@@ -45,6 +82,12 @@ struct message_holding_buffer* get_send_buffer()
 
 
 
+/*
+ * Returns a pointer to the current receive buffer for a given address.
+ * Internally, the receive buffer maps rmp_address's to buffers of up to one
+ * message from that address.
+ * Allocates the buffer if it does not already exist.
+ */
 struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
 {
 	static map *node_to_buffer_map;
@@ -194,15 +237,97 @@ int RMP_createSocket(rmp_address *address)
 
 
 
+int sendTo(int socket_fd, rmp_address *destination, int num_retries)
+{
+	// Send data message
+	struct message_holding_buffer* outgoing_buffer = get_send_buffer();
+	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
+	                                       outgoing_buffer->type,
+	                                       outgoing_buffer->id,
+               		 					   outgoing_buffer->message,
+               		 					   outgoing_buffer->message_length);
+
+	// Wait for ACK
+
+	// First set socket receive timeout
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = ACK_TIMEOUT_USEC;
+	int status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	if(status == -1) {
+		perror("setsockopt failed to set timeout in sendTo");
+		return -1;
+	}
+
+	// Then start the message processing timer
+	struct timeval start_time, current_time;
+	status = gettimeofday(&start_time, NULL);
+	if(status == -1) {
+		perror("gettimeofday failed in sendTo");
+		reset_socket_timeout(socket_fd);
+		outgoing_buffer->occupied = 0;
+		return -1;
+	}
+
+	// Then process incoming messages until an ACK from the recipient is received
+	struct sockaddr_in recv_src_address;
+	enum message_type recv_type;
+	message_id recv_id;
+	char *result_buffer = (char *) malloc(MAX_MESSAGE_SIZE * sizeof(char *));
+	do {
+		status = gettimeofday(&current_time, NULL);
+		if(status == -1) {
+			perror("gettimeofday failed in sendTo");
+			reset_socket_timeout(socket_fd);
+			outgoing_buffer->occupied = 0;
+			return -1;
+		}
+		if(interval_greater_than_value(&start_time, &current_time, ACK_TIMEOUT_USEC)) {
+			// Timeout
+			free(result_buffer);
+			reset_socket_timeout(socket_fd);
+			if(num_retries == 0) {
+				outgoing_buffer->occupied = 0;
+				return -2;
+			} else {
+				return sendTo(socket_fd, destination, num_retries - 1);
+			}
+		}
+
+		status = receive_and_process_message(socket_fd, &recv_src_address,
+	                                &recv_type, &recv_id,
+	                                result_buffer, MAX_MESSAGE_SIZE);
+		if(status == -1) {
+			free(result_buffer);
+			reset_socket_timeout(socket_fd);
+			outgoing_buffer->occupied = 0;
+			return status;
+		}		
+	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
+	        recv_type != ACK ||
+	        recv_id != outgoing_buffer->id);
+
+	free(result_buffer);
+
+	status = reset_socket_timeout(socket_fd);
+	if(status == -1) {
+		perror("setsockopt failed to reset timeout in sendTo");
+		outgoing_buffer->occupied = 0;
+		return -1;
+	}
+
+	outgoing_buffer->occupied = 0;
+	return num_bytes_sent;
+}
+
+
+
 int RMP_sendTo(int socket_fd, rmp_address *destination,
                const void *buffer, int num_bytes)
 {
 	// Send data message
 	message_id new_id = random();
 	enum message_type type = DATA;
-	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
-	                                       type, new_id,
-               		 					   buffer, num_bytes);
 
 	struct message_holding_buffer* outgoing_buffer = get_send_buffer();
 	outgoing_buffer->occupied = 1;
@@ -211,56 +336,14 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	outgoing_buffer->message = (void *)buffer;
 	outgoing_buffer->message_length = num_bytes;
 
-	// Wait for ACK
-
-	// First set socket receive timeout
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 20000;  // 20ms
-	int status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-	if(status == -1) {
-		perror("setsockopt failed to set timeout in RMP_sendTo");
-		return -1;
-	}
-
-	struct sockaddr_in recv_src_address;
-	enum message_type recv_type;
-	message_id recv_id;
-	char *result_buffer = (char *) malloc(MAX_MESSAGE_SIZE * sizeof(char *));
-	do {
-		status = receive_and_process_message(socket_fd, &recv_src_address,
-	                                &recv_type, &recv_id,
-	                                result_buffer, MAX_MESSAGE_SIZE);
-		if(status < 0) {
-			free(result_buffer);
-			// Reset socket receive timeout
-			tv.tv_sec = 0;
-			tv.tv_usec = 0;
-			setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-			return status;
-		}		
-	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
-	        recv_type != ACK ||
-	        recv_id != new_id);
-
-	free(result_buffer);
-
-	// Reset socket receive timeout
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	status = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-	if(status == -1) {
-		perror("setsockopt failed to reset timeout in RMP_sendTo");
-		return -1;
-	}
-
-	return num_bytes_sent;
+	return sendTo(socket_fd, destination, NUM_RETRIES);
 }
 
 
 
 int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address)
 {
+	// Process incoming messages until a receive transaction is completed
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
@@ -274,7 +357,7 @@ int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address
 		}		
 	} while(recv_type != SYN_ACK);
 
-    // Other stuff
+    // Pass back the source address
     if(src_address != NULL) {
 		memcpy(src_address, &recv_src_address, sizeof(rmp_address));
 	}
