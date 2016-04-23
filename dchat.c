@@ -230,7 +230,7 @@ void process_participant_update (char* command, int joining) {
 
     // if not new to chat, print out join / leave message
     if (!joining) {
-      printf("NOTICE %s\n", currPos);
+      printf("%s\n", currPos);
     }
   } else {
     fprintf(stderr, "Unexpected EOF in parsing PARTICIPANT_UPDATE\n");
