@@ -2,6 +2,7 @@
 #define __MAP_H__
 
 typedef struct map map;
+typedef struct map_iterator map_iterator;
 
 /*
  * Returns a pointer to an empty map or NULL on error.
@@ -36,5 +37,28 @@ void* map_remove(map *m, long long key);
  * Returns the number of pairs in the map.
  */
 int map_size(map *m);
+
+/*
+ * Returns a pointer to a new iterator for the given map or NULL on error.
+ */
+map_iterator* map_iterator_new(map *m);
+
+/*
+ * Returns a pointer to the next value in the map, or NULL if there are no
+ * remaining items.  Places the key corresponding to the given value in *key
+ * if key is not NULL.
+ */
+void* map_iterator_next(map_iterator *iterator, long long *key);
+
+/*
+ * Removes the last item returned by the iterator.
+ * Does nothing if map_iterator_next() has not been called at least once.
+ */
+void map_iterator_remove(map_iterator *iterator);
+
+/*
+ * Empties and frees the iterator.
+ */
+void map_iterator_free(map_iterator *iterator);
 
 #endif
