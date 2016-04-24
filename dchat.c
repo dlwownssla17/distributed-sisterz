@@ -166,7 +166,9 @@ int join_chat(char *addr_port) {
     }
 
     // receive response
-    if (RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr) < 0) {
+    int status;
+    while((status = RMP_listen(socket_fd, recv_buff, sizeof(recv_buff), &recv_addr)) == 0);
+    if (status < 0) {
       fprintf(stderr, "RMP_listen error\n");
       exit(1);
     }
@@ -382,6 +384,8 @@ void chat() {
       if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &recv_addr)) == -1) {
         perror("chat_leader: RMP_listen");
         exit(1);
+      } else if(num_bytes == 0) {
+        continue;
       }
 
       buf[num_bytes - 1] = '\0';

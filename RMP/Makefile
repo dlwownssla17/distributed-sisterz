@@ -3,13 +3,16 @@ CC=clang
 
 .PHONY: clean test	
 
-librmp.a: rmp.o protocol.o map.o
+librmp.a: rmp.o message_buffers.o protocol.o map.o
 	ar -cvq $@ $^
+
+message_buffers.o: message_buffers.c message_buffers.h protocol.h
+	$(CC) $(CFLAGS) -c message_buffers.c
 
 protocol.o: protocol.c protocol.h
 	$(CC) $(CFLAGS) -c protocol.c
 
-rmp.o: rmp.c rmp.h protocol.o
+rmp.o: rmp.c rmp.h protocol.o message_buffers.o
 	$(CC) $(CFLAGS) -c rmp.c
 
 map.o:

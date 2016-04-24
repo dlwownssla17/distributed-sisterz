@@ -6,17 +6,9 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "message_buffers.h"
 #include "protocol.h"
-#include "../structures/map.h"
 #include "rmp.h"
-
-struct message_holding_buffer {
-	int occupied;
-	enum message_type type;
-	message_id id;
-	char *message;
-	size_t message_length;
-};
 
 
 
@@ -49,63 +41,34 @@ int interval_greater_than_value(struct timeval *first, struct timeval *second, l
 
 
 /*
- * Maps rmp_addresses to long long integers, for use as keys in a map.
+ * Checks for timeout expiration or general buffer invalidation.
  */
-long long rmp_address_hash(rmp_address *address)
+int maintain_buffer_element(int socket_fd, struct message_holding_buffer *buffer)
 {
-	unsigned long ip = address->sin_addr.s_addr;
-	unsigned short port = address->sin_port;
-	long long output = 0;
-	memcpy(&output, &ip, sizeof(unsigned long));
-	memcpy((&output) + sizeof(unsigned long), &port, sizeof(unsigned short));
-	return output;
-}
+	struct timeval current_time;
+	gettimeofday(&current_time, NULL);
 
-
-
-/*
- * Returns a pointer to the current send buffer.
- * The send buffer holds up to one message that is in the process of being sent.
- * Allocates the buffer if it does not already exist.
- */
-struct message_holding_buffer* get_send_buffer()
-{
-	static struct message_holding_buffer *buffer;
-	if(buffer == NULL) {
-		buffer = (struct message_holding_buffer *) malloc(sizeof(struct message_holding_buffer));
-		if(buffer != NULL) {
-			buffer->occupied = 0;
+	if(interval_greater_than_value(&(buffer->timestamp), &current_time,
+	                               ACK_TIMEOUT_USEC)) {
+		if(buffer->retries_remaining == 0 || buffer->occupied == 0) {
+			return -1;
+		} else {
+			buffer->retries_remaining--;
+			buffer->timestamp = current_time;
+			send_rmp_datagram(socket_fd, buffer->peer, ACK, buffer->id, NULL, 0);			
 		}
 	}
-	return buffer;
+
+	return 0;
 }
 
 
 
-/*
- * Returns a pointer to the current receive buffer for a given address.
- * Internally, the receive buffer maps rmp_address's to buffers of up to one
- * message from that address.
- * Allocates the buffer if it does not already exist.
- */
-struct message_holding_buffer* get_receive_buffer_for(rmp_address *src_address)
+void clean_receive_buffer(int socket_fd)
 {
-	static map *node_to_buffer_map;
-	if(node_to_buffer_map == NULL) {
-		node_to_buffer_map = map_new();
-	}
-
-	long long key = rmp_address_hash(src_address);
-	struct message_holding_buffer *message_buffer = map_get(node_to_buffer_map, key);
-	if(message_buffer == NULL) {
-		message_buffer = malloc(sizeof(struct message_holding_buffer));
-		if(message_buffer != NULL) {
-			message_buffer->occupied = 0;
-			map_put(node_to_buffer_map, key, message_buffer);
-		}
-	}
-	return message_buffer;
+	iterate_over_send_buffer(socket_fd, maintain_buffer_element);
 }
+
 
 
 /*
@@ -117,6 +80,9 @@ int receive_and_process_message(int socket_fd, struct sockaddr_in *src_address,
                                 enum message_type *type, message_id *id,
                                 void *result_buffer, size_t buffer_size)
 {
+	// Retry timed out Acks
+	clean_receive_buffer(socket_fd);
+
 	// Wait for a message
 	int num_bytes_received = receive_rmp_datagram(socket_fd,
 	                                              src_address, type, id,
@@ -143,6 +109,9 @@ int receive_and_process_message(int socket_fd, struct sockaddr_in *src_address,
 			message_buffer->message = (char *) malloc(num_bytes_received * sizeof(char *));
 			memcpy(message_buffer->message, result_buffer, num_bytes_received);
 			message_buffer->message_length = num_bytes_received;
+			gettimeofday(&(message_buffer->timestamp), NULL);
+			message_buffer->peer = src_address;
+			message_buffer->retries_remaining = NUM_RETRIES;
     		status = send_rmp_datagram(socket_fd, src_address, ACK, *id, NULL, 0);
     		if(status == -1) {
     			return -1;
@@ -237,18 +206,18 @@ int RMP_createSocket(rmp_address *address)
 
 
 
-int sendTo(int socket_fd, rmp_address *destination, int num_retries)
+int attemptSend(int socket_fd)
 {
 	// Send data message
 	struct message_holding_buffer* outgoing_buffer = get_send_buffer();
-	int num_bytes_sent = send_rmp_datagram(socket_fd, destination,
+	int num_bytes_sent = send_rmp_datagram(socket_fd,
+	                                       outgoing_buffer->peer,
 	                                       outgoing_buffer->type,
 	                                       outgoing_buffer->id,
                		 					   outgoing_buffer->message,
                		 					   outgoing_buffer->message_length);
 
 	// Wait for ACK
-
 	// First set socket receive timeout
 	struct timeval tv;
 	tv.tv_sec = 0;
@@ -260,8 +229,8 @@ int sendTo(int socket_fd, rmp_address *destination, int num_retries)
 	}
 
 	// Then start the message processing timer
-	struct timeval start_time, current_time;
-	status = gettimeofday(&start_time, NULL);
+	struct timeval current_time;
+	status = gettimeofday(&(outgoing_buffer->timestamp), NULL);
 	if(status == -1) {
 		perror("gettimeofday failed in sendTo");
 		reset_socket_timeout(socket_fd);
@@ -282,15 +251,16 @@ int sendTo(int socket_fd, rmp_address *destination, int num_retries)
 			outgoing_buffer->occupied = 0;
 			return -1;
 		}
-		if(interval_greater_than_value(&start_time, &current_time, ACK_TIMEOUT_USEC)) {
+		if(interval_greater_than_value(&(outgoing_buffer->timestamp), &current_time, ACK_TIMEOUT_USEC)) {
 			// Timeout
 			free(result_buffer);
 			reset_socket_timeout(socket_fd);
-			if(num_retries == 0) {
+			if(outgoing_buffer->retries_remaining == 0) {
 				outgoing_buffer->occupied = 0;
 				return -2;
 			} else {
-				return sendTo(socket_fd, destination, num_retries - 1);
+				outgoing_buffer->retries_remaining--;
+				return attemptSend(socket_fd);
 			}
 		}
 
@@ -303,7 +273,7 @@ int sendTo(int socket_fd, rmp_address *destination, int num_retries)
 			outgoing_buffer->occupied = 0;
 			return status;
 		}		
-	} while(memcmp(&recv_src_address, destination, sizeof(rmp_address)) != 0 ||
+	} while(memcmp(&recv_src_address, outgoing_buffer->peer, sizeof(rmp_address)) != 0 ||
 	        recv_type != ACK ||
 	        recv_id != outgoing_buffer->id);
 
@@ -335,34 +305,37 @@ int RMP_sendTo(int socket_fd, rmp_address *destination,
 	outgoing_buffer->id = new_id;
 	outgoing_buffer->message = (void *)buffer;
 	outgoing_buffer->message_length = num_bytes;
+	outgoing_buffer->peer = destination;
+	outgoing_buffer->retries_remaining = NUM_RETRIES;
 
-	return sendTo(socket_fd, destination, NUM_RETRIES);
+	return attemptSend(socket_fd);
 }
 
 
 
 int RMP_listen(int socket_fd, void *buffer, size_t len, rmp_address *src_address)
 {
-	// Process incoming messages until a receive transaction is completed
 	struct sockaddr_in recv_src_address;
 	enum message_type recv_type;
 	message_id recv_id;
-	int num_bytes_received;
-	do {
-		num_bytes_received = receive_and_process_message(socket_fd, &recv_src_address,
-	                                			 			 &recv_type, &recv_id,
-	                                			 			 buffer, len);
-		if(num_bytes_received < 0) {
-			return num_bytes_received;
-		}		
-	} while(recv_type != SYN_ACK);
+	int num_bytes_received = receive_and_process_message(socket_fd, &recv_src_address,
+	                                			 		 &recv_type, &recv_id,
+	                                			 		 buffer, len);
+	if(num_bytes_received < 0) {
+		// Error
+		return num_bytes_received;
+	} else if(recv_type == SYN_ACK) {
+		// A message transaction was completed
+	    // Pass back the source address
+	    if(src_address != NULL) {
+			memcpy(src_address, &recv_src_address, sizeof(rmp_address));
+		}
 
-    // Pass back the source address
-    if(src_address != NULL) {
-		memcpy(src_address, &recv_src_address, sizeof(rmp_address));
+	    return num_bytes_received;	
+	} else {
+		// False alarm - just meta traffic
+		return 0;
 	}
-
-    return num_bytes_received;
 }
 
 
