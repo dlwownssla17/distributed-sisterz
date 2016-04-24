@@ -12,6 +12,13 @@ LIST_HEAD(pair_list_head, map_pair);
 
 struct map {
 	struct pair_list_head pairs;
+	int size;
+};
+
+struct map_iterator {
+	struct map_pair *current;
+	struct map_pair *previous;
+	struct map *source;
 };
 
 
@@ -34,6 +41,7 @@ map* map_new()
 	map *m = (map *) malloc(sizeof(map));
 	if(m != NULL) {
 		LIST_INIT(&(m->pairs));
+		m->size = 0;
 	}
 	return m;
 }
@@ -42,6 +50,13 @@ map* map_new()
 
 void map_free(map *m)
 {
+	struct map_pair *current = LIST_FIRST(&(m->pairs));
+	struct map_pair *next;
+    while(current != NULL) {
+    	next = LIST_NEXT(current, entries);
+        free(current);
+        current = next;
+    }
 	free(m);
 }
 
@@ -64,6 +79,8 @@ int map_put(map *m, long long key, void *value)
 	new_pair->key = key;
 	new_pair->value = value;
 	LIST_INSERT_HEAD(&(m->pairs), new_pair, entries);
+
+	m->size++;
 
 	return 0;
 }
@@ -92,5 +109,63 @@ void* map_remove(map *m, long long key)
 	LIST_REMOVE(target_pair, entries);
 	void *value = target_pair->value;
 	free(target_pair);
+
+	m->size--;
+
 	return value;
+}
+
+
+
+int map_size(map *m)
+{
+	return m->size;
+}
+
+
+
+map_iterator* map_iterator_new(map *m)
+{
+	map_iterator *iterator = (map_iterator *) malloc(sizeof(map_iterator));
+	if(iterator != NULL) {
+		iterator->current = LIST_FIRST(&(m->pairs));
+		iterator->previous = NULL;
+		iterator->source = m;
+	}
+	return iterator;
+}
+
+
+
+void* map_iterator_next(map_iterator *iterator, long long *key)
+{
+	if(iterator->current == NULL) {
+		return NULL;
+	}
+
+	if(key != NULL) {
+		*key = iterator->current->key;
+	}
+
+	iterator->previous = iterator->current;
+	iterator->current = LIST_NEXT(iterator->current, entries);
+
+	return iterator->previous->value;
+}
+
+
+
+void map_iterator_remove(map_iterator *iterator)
+{
+	LIST_REMOVE(iterator->previous, entries);
+	free(iterator->previous);
+	iterator->source->size--;
+}
+
+
+
+
+void map_iterator_free(map_iterator *iterator)
+{
+	free(iterator);
 }
