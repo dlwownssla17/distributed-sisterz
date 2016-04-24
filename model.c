@@ -71,6 +71,19 @@ void insert_participant(char* nickname, char* ip_address, char* port_num, int is
   num_participants++;
 }
 
+/* checks if the current list of participants contains a participant with
+ * given nickname
+ */
+int contains_participant(char* nickname) {
+  Participant *curr_p;
+  TAILQ_FOREACH(curr_p, &participants_head, participants) {
+    if (!strcmp(curr_p->nickname, nickname)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 int get_is_leader() {
   return is_leader;
 }

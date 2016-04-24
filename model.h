@@ -24,6 +24,11 @@ int empty_list();
  */
 void insert_participant(char* nickname, char* ip_address, char* port_num, int is_leader);
 
+/* checks if the current list of participants contains a participant with
+ * given nickname
+ */
+int contains_participant(char* nickname);
+
 // Should be called when program first starts to initialized data structures
 void model_init();
 
