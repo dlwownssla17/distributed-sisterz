@@ -143,3 +143,11 @@ void set_leader_by_nickname(char* nickname) {
 char* get_leader_nickname() {
   return leader->nickname;
 }
+
+int get_num_participants() {
+  return num_participants;
+}
+
+void decr_num_participants() {
+  num_participants--;
+}

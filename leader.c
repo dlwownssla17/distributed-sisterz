@@ -141,6 +141,7 @@ void leader_broadcast_message(char* message) {
         TAILQ_REMOVE(get_participants_head(), curr_p, participants);
         // mark for deletion next
         remove_next = 1;
+        decr_num_participants();
       }
     }
   }

@@ -108,6 +108,8 @@ int start_chat() {
   insert_participant(this_nickname, ip_address, port_num, 1);
   
   printf("%s started a new chat, listening on %s:%s\n", this_nickname, ip_address, port_num);
+
+  printf("Waiting for others to join...\n");
   
   return 0;
 }
@@ -356,6 +358,10 @@ void declare_victory() {
   generate_participant_update(update_command, sizeof(update_command), victory_message);
   leader_broadcast_message(update_command);
   printf("%s\n", victory_message);
+
+  if (get_num_participants() == 1) {
+    printf("Waiting for others to join...\n");
+  }
 }
 
 void send_heartbeat() {
@@ -416,9 +422,12 @@ void chat() {
       int num_bytes = read(STDIN_FILENO, buf, MAX_BUFFER_LEN);
 
       if (num_bytes > 1) {
-        buf[num_bytes - 1] = '\0';
+        // if only one participant, just wait
+        if (get_num_participants() != 1) {
+          buf[num_bytes - 1] = '\0';
 
-        recv_stdin(buf, num_bytes);
+          recv_stdin(buf, num_bytes);
+        }
       } else if (num_bytes == 0) {
         // CTRL+D was pressed
         break;

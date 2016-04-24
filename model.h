@@ -56,4 +56,8 @@ void free_participant(Participant* p);
 
 char* get_leader_nickname();
 
+int get_num_participants();
+
+void decr_num_participants();
+
 #endif
