@@ -56,7 +56,7 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
   } else if (!strcmp(MESSAGE_REQUEST, command_type)) {
     char sender_nickname[MAX_NICKNAME_LEN];
     char payload[MAX_BUFFER_LEN];
-    // TODO: check for right # of matches
+
     if (sscanf(rest_command, "%[^ =]= %[^\n]", sender_nickname, payload) == EOF) {
       perror("chat_non_leader: sscanf for command_type");
       exit(1);
@@ -87,13 +87,11 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
 void generate_participant_update(char* command_buff, int buff_len, char* join_leave_message) {
   Participant* leader = get_leader();
 
-  // TODO: handle buffer overflow
   command_buff += snprintf(command_buff, buff_len, "%s @%s:%s:%s ",
     MESSAGE_PARTICIPANT_UPDATE, leader->nickname, leader->ip_address, leader->port_num);
 
   Participant *curr_p;
 
-  // TODO: fix traversal
   TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
     if (!curr_p->is_leader) {
       command_buff += snprintf(command_buff, buff_len, "%s:%s:%s ",
@@ -119,7 +117,6 @@ void leader_broadcast_message(char* message) {
   char update_buff[MAX_BUFFER_LEN];
   int update_buff_pos = 0;
 
-  // TODO: fix iteration
   TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
     if (prev_p && remove_next) {
       // free previous

@@ -9,7 +9,7 @@ typedef struct Participant {
   char *nickname;
   char *ip_address;
   char *port_num;
-  int is_leader; // TODO: is this necessary?
+  int is_leader;
   TAILQ_ENTRY(Participant) participants;
 } Participant;
 
