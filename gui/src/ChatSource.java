@@ -21,7 +21,11 @@ public abstract class ChatSource {
 	 * @throws IOException
 	 */
 	protected boolean interpretInput(BufferedReader r) throws IOException {
+		System.out.println("reading");
+		
 		String line = r.readLine();
+		
+		System.out.println(line);
 		
 		if (line == null) {
 			return false;

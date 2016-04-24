@@ -418,6 +418,10 @@ void exit_chat() {
 
 // run dchat
 int main(int argc, char** argv) {
+  // set line buffering
+  setvbuf(stdout, NULL, _IOLBF, 1024);
+  setvbuf(stderr, NULL, _IOLBF, 1024);
+
   // error if invalid number of arguments
   if (argc != 2 && argc != 3) {
     printf("Usage: dchat <NICKNAME> [<ADDR:PORT>]\n");

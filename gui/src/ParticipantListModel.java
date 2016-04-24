@@ -32,7 +32,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 	
 	@Override
 	public synchronized String getElementAt(int index) {
-		if (index >= participants.size()) {
+		if (index >= sortedParticipants.size()) {
 			return null;
 		}
 		String participant = sortedParticipants.get(index);
@@ -41,7 +41,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 
 	@Override
 	public synchronized int getSize() {
-		return participants.size();
+		return sortedParticipants.size();
 	}
 
 	public synchronized void setParticipants(String[] participantsList, String leader) {
@@ -87,7 +87,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 		if (participants.contains(newLeader)) {
 			leader = newLeader;
 			int leaderIndex = sortedParticipants.indexOf(newLeader);
-			fireContentsChanged(this,leaderIndex, leaderIndex);
+			fireContentsChanged(this, leaderIndex, leaderIndex);
 		} else {
 			throw new IllegalArgumentException("Leader not in model");
 		}
