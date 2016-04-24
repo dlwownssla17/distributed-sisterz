@@ -235,68 +235,6 @@ int join_chat(char *addr_port) {
   return 0;
 }
 
-<<<<<<< HEAD
-=======
-void broadcast_message(char* message) {
-  Participant *curr_p;
-  Participant *prev_p = NULL;
-  int remove_next = 0;
-
-  rmp_address curr_address;
-
-  int message_len = strlen(message);
-
-  int need_update = 0;
-
-  char update_buff[MAX_BUFFER_LEN];
-  int update_buff_pos = 0;
-
-  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
-    if (prev_p && remove_next) {
-      // free previous
-      free_participant(prev_p);
-    }
-
-    remove_next = 0;
-
-    if (!curr_p->is_leader) {
-      // get address
-      if (RMP_getAddressFor(curr_p->ip_address, curr_p->port_num, &curr_address) < 0) {
-        fprintf(stderr, "Broadcast RMP_getAddressFor error\n");
-        exit(1);
-      }
-      // send message
-      if (RMP_sendTo(socket_fd, &curr_address, message, message_len + 1) < 0) {
-        // node could not be reached, so remove it and PARTICIPANT_UPDATE
-        need_update = 1;
-        update_buff_pos += snprintf(update_buff + update_buff_pos, MAX_BUFFER_LEN - update_buff_pos,
-          "%s, ", curr_p->nickname);
-        // logically delete
-        TAILQ_REMOVE(get_participants_head(), curr_p, participants);
-        // mark for deletion next
-        remove_next = 1;
-      }
-    }
-  }
-
-  if (prev_p && remove_next) {
-    free_participant(prev_p);
-  }
-
-  if (need_update) {
-    char update_command[1024];
-    char leave_message[1024];
-
-    // get rid of last comma
-    update_buff[update_buff_pos - 2] = '\0';
-    snprintf(leave_message, 1024, "NOTICE %s left the chat or crashed", update_buff);
-    generate_participant_update(update_command, sizeof(update_command), leave_message);
-    broadcast_message(update_command);
-    printf("%s\n", leave_message);
-  }
-}
-
->>>>>>> 9ff942e8389ff11dd18bf00005336f211145e220
 void get_leader_addr(rmp_address* leader_addr) {
   Participant* leader = get_leader();
 
@@ -347,6 +285,7 @@ void start_election() {
 /* Receive a ELECTION_STOP message */
 void stop_election() {
   IF_DEBUG(printf("receive ELECTION_STOP\n"));
+
   in_election = 1;
   started_election = 0;
 }
@@ -410,6 +349,13 @@ void declare_victory() {
   set_is_leader(1);
 
   leader_broadcast_message(MESSAGE_ELECTION_VICTORY);
+
+  char update_command[MAX_BUFFER_LEN], victory_message[MAX_BUFFER_LEN];
+
+  snprintf(victory_message, 1024, "NOTICE %s is the new leader", this_nickname);
+  generate_participant_update(update_command, sizeof(update_command), victory_message);
+  leader_broadcast_message(update_command);
+  printf("%s\n", victory_message);
 }
 
 void send_heartbeat() {

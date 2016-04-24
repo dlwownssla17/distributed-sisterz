@@ -54,4 +54,6 @@ ParticipantsHead* get_participants_head();
 /* Frees the participant and all of its dynamically allocated fields */
 void free_participant(Participant* p);
 
+char* get_leader_nickname();
+
 #endif

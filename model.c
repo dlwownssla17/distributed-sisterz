@@ -139,3 +139,7 @@ void set_leader_by_nickname(char* nickname) {
     }
   }
 }
+
+char* get_leader_nickname() {
+  return leader->nickname;
+}
