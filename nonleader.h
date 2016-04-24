@@ -10,3 +10,5 @@
 void process_participant_update (char* command, int joining);
 
 void non_leader_receive_message (char* buf, rmp_address* recv_addr);
+
+void nonleader_broadcast_message(char* message);

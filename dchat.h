@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include "RMP/rmp.h"
 /* constants */
 
 #ifndef MAX_BUFFER_LEN
@@ -23,6 +24,16 @@
 // maximum port num length
 #define MAX_PORT_NUM_LEN 5
 
+#define MESSAGE_ADD_ME "ADD_ME"
+#define MESSAGE_PARTICIPANT_UPDATE "PARTICIPANT_UPDATE"
+#define MESSAGE_JOIN_FAILURE "JOIN_FAILURE"
+#define MESSAGE_LEADER_ID "LEADER_ID"
+#define MESSAGE_BROADCAST "MESSAGE_BROADCAST"
+#define MESSAGE_REQUEST "MESSAGE_REQUEST"
+#define MESSAGE_START_ELECTION "MESSAGE_START_ELECTION"
+#define MESSAGE_STOP_ELECTION "MESSAGE_STOP_ELECTION"
+#define MESSAGE_HEARTBEAT "HEARTBEAT"
+
 #ifdef DEBUG
 # define IF_DEBUG(x) x
 #else
@@ -37,6 +48,8 @@ void set_clock(int new_num);
 
 int get_socket_fd();
 
-void broadcast_message(char* message);
+void respond_to_leader_election(rmp_address *recv_addr);
+
+char* get_own_nickname();
 
 #endif

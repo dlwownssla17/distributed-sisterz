@@ -14,4 +14,6 @@ void leader_receive_message(char* buf, rmp_address* recv_addr);
  */
 void generate_participant_update(char* command_buff, int buff_len, char* join_leave_message);
 
+void leader_broadcast_message(char* message);
+
 #endif

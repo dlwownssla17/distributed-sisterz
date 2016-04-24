@@ -8,9 +8,6 @@
 #include "RMP/rmp.h"
 #include "nonleader.h"
 
-#ifndef __NONLEADER_H__
-#define __NONLEADER_H__
-
 /**
  * Takes in a command and updates the participant list, leader, num_participants
  * @param command The PARTICIPANT_UPDATE command
@@ -101,7 +98,7 @@ void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
     exit(1);
   }
   // receive message
-  if (!strcmp("MESSAGE_BROADCAST", message_type)) {
+  if (!strcmp(MESSAGE_BROADCAST, message_type)) {
     int message_id;
     char sender_nickname[MAX_NICKNAME_LEN + 1];
     char message_payload[MAX_BUFFER_LEN + 1];
@@ -111,28 +108,30 @@ void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
     }
     set_clock(message_id);
     printf("%s:: %s\n", sender_nickname, message_payload);
-  } else if (!strcmp("PARTICIPANT_UPDATE", message_type)) {
+  } else if (!strcmp(MESSAGE_PARTICIPANT_UPDATE, message_type)) {
     // receive participant update
     process_participant_update(buf, 0);
-  } else if (!strcmp("START_ELECTION", message_type)) {
+  } else if (!strcmp(MESSAGE_START_ELECTION, message_type)) {
     // receive start election
     // TODO: elections
-  } else if (!strcmp("ADD_ME", message_type)) {
+  } else if (!strcmp(MESSAGE_ADD_ME, message_type)) {
     // receive add me
     // process message request
     char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
 
     Participant* leader = get_leader();
 
-    snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s:%s", leader->ip_address, leader->port_num);
+    snprintf(message_request_buf, sizeof(message_request_buf), "%s %s:%s", MESSAGE_LEADER_ID, leader->ip_address, leader->port_num);
 
     // send message request
     if (RMP_sendTo(get_socket_fd(), recv_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
       printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
       exit(1);
     }
-  } else if (!strcmp("HEARTBEAT", message_type)) {
+  } else if (!strcmp(MESSAGE_HEARTBEAT, message_type)) {
     // ignore, don't have to do anything on receiving end
+  }  else if(!strcmp(MESSAGE_START_ELECTION, message_type)) {
+    respond_to_leader_election(recv_addr);
   } else {
     // invalid message
     printf("chat_non_leader, invalid message received: %s\n", buf);
@@ -140,4 +139,27 @@ void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
   }
 }
 
-#endif
+void nonleader_broadcast_message(char* message) {
+  int socket_fd = get_socket_fd();
+
+  Participant *curr_p;
+  rmp_address curr_address;
+
+  int message_len = strlen(message);
+
+  // TODO: fix iteration
+  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
+
+    if(strcmp(get_own_nickname(), curr_p->nickname) == 0) {
+      continue;
+    }
+
+    // get address
+    if (RMP_getAddressFor(curr_p->ip_address, curr_p->port_num, &curr_address) < 0) {
+      fprintf(stderr, "Broadcast RMP_getAddressFor error\n");
+      exit(1);
+    }
+    // send message
+    RMP_sendTo(socket_fd, &curr_address, message, message_len + 1);
+  }
+}
