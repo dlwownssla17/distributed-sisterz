@@ -1,5 +1,8 @@
 /*** dchat.h ***/
 
+#ifndef __DCHAT_H__
+#define __DCHAT_H__
+
 /* includes */
 
 #include <stdlib.h>
@@ -25,5 +28,15 @@
 #else
 # define IF_DEBUG(x) ((void)0)
 #endif
+
+#endif
+
+int incr_clock();
+
+void set_clock(int new_num);
+
+int get_socket_fd();
+
+void broadcast_message(char* message);
 
 #endif

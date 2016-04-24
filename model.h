@@ -1,5 +1,8 @@
 #include <sys/queue.h>
 
+#ifndef __MODEL_H__
+#define __MODEL_H__
+
 /* Typedef */
 // participant struct
 typedef struct Participant {
@@ -35,3 +38,5 @@ ParticipantsHead* get_participants_head();
 
 /* Frees the participant and all of its dynamically allocated fields */
 void free_participant(Participant* p);
+
+#endif
