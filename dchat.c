@@ -16,24 +16,21 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <ifaddrs.h>
-#include <sys/time.h>
+#include <time.h>
 #include "dchat.h"
+#include "model.h"
 #include "RMP/rmp.h"
 
 /* global variables */
 char this_nickname[MAX_NICKNAME_LEN + 1];
 
-int is_leader = 0;
-Participant *leader;
-
 int clock_num = 0;
-
-ParticipantsHead *participants_head;
-int num_participants = 0;
 
 int socket_fd;
 
 const struct timespec JOIN_ATTEMPT_WAIT_TIME = {.tv_sec = 0, .tv_nsec = 5e8};
+
+const struct timeval HEARTBEAT_INTERVAL = {.tv_sec = 3, .tv_usec = 0};
 
 /* functions */
 
@@ -42,7 +39,7 @@ const struct timespec JOIN_ATTEMPT_WAIT_TIME = {.tv_sec = 0, .tv_nsec = 5e8};
  * @param  ip_address Stores the address in this char* buffer
  * @return 0 if success, 1 otherwise
  */
-int get_ip_address(char* ip_address) {
+void get_ip_address(char* ip_address) {
   struct ifaddrs *ifaddr, *curr;
   if (getifaddrs(&ifaddr) == -1) {
     perror("getifaddrs");
@@ -52,8 +49,8 @@ int get_ip_address(char* ip_address) {
   while (curr) {
     if (curr->ifa_addr && curr->ifa_addr->sa_family == AF_INET && !strcmp(curr->ifa_name, "em1")) {
       struct sockaddr_in *p_addr = (struct sockaddr_in *)curr->ifa_addr;
-      char *this_ip_address = inet_ntoa(p_addr->sin_addr);
-      strncpy(ip_address, this_ip_address, strlen(this_ip_address));
+      strncpy(ip_address, inet_ntoa(p_addr->sin_addr),
+        MAX_IP_ADDRESS_LEN + 1);
       break;
     }
     curr = curr->ifa_next;
@@ -63,63 +60,6 @@ int get_ip_address(char* ip_address) {
     printf("Could not find ip address.\n");
     exit(1);
   }
-  
-  return 0;
-}
-
-// empty list of participants
-int empty_list() {
-  // remove all participants
-  Participant *curr_p;
-  Participant *prev_p = NULL;
-  TAILQ_FOREACH(curr_p, participants_head, participants) {
-    if (prev_p) {
-      free(prev_p->nickname);
-      free(prev_p->ip_address);
-      free(prev_p->port_num);
-      free(prev_p);
-    }
-    TAILQ_REMOVE(participants_head, curr_p, participants);
-    prev_p = curr_p;
-  }
-  if (prev_p) {
-    free(prev_p->nickname);
-    free(prev_p->ip_address);
-    free(prev_p->port_num);
-    free(prev_p);
-  }
-
-  // set number of participants back to zero
-  num_participants = 0;
-
-  // should have been freed
-  leader = NULL;
-
-  return 0;
-}
-
-/* Inserts a participant to the list with the given info
- * Sets the global leader variable if necessary and increases number of participants
- */
-void insert_participant(char* nickname, char* ip_address, char* port_num, int is_leader) {
-  Participant* p = malloc(sizeof(Participant));
-  p->nickname = malloc(MAX_NICKNAME_LEN + 1);
-  strncpy(p->nickname, nickname, MAX_NICKNAME_LEN + 1);
-  p->ip_address = malloc(MAX_IP_ADDRESS_LEN + 1);
-  strncpy(p->ip_address, ip_address, MAX_IP_ADDRESS_LEN + 1);
-  p->port_num = malloc(MAX_PORT_NUM_LEN + 1);
-  strncpy(p->port_num, port_num, MAX_PORT_NUM_LEN + 1);
-  p->is_leader = is_leader;
-  
-  if (is_leader) {
-    leader = p;
-  }
-  
-  // add participant to list of participants
-  TAILQ_INSERT_TAIL(participants_head, p, participants);
-
-  // update number of participants
-  num_participants++;
 }
 
 // start a new chat group as the leader
@@ -145,13 +85,10 @@ int start_chat() {
   // set port_num
   sprintf(port_num, "%d", RMP_getPortFrom(&this_addr));
   
-  // set is_leader
-  is_leader = 1;
-  
-  // initialize list of participants
-  participants_head = malloc(sizeof(ParticipantsHead));
-  TAILQ_INIT(participants_head);
-  
+  model_init();
+
+  set_is_leader(1);
+
   // set leader
   insert_participant(this_nickname, ip_address, port_num, 1);
   
@@ -266,8 +203,10 @@ int join_chat(char *addr_port) {
   // get my port_num
   sprintf(port_num, "%d", RMP_getPortFrom(&this_addr));
   
-  // set is_leader to false
-  is_leader = 0;
+  // initialize participant list
+  model_init();
+
+  set_is_leader(0);
 
   printf("%s joining a new chat on %s, listening on %s:%s\n", this_nickname, addr_port,
     ip_address, port_num);
@@ -320,9 +259,6 @@ int join_chat(char *addr_port) {
       fprintf(stderr, "On command: %s\n", recv_buff);
       exit(1);
     } else if (!strcmp("PARTICIPANT_UPDATE", command_type)) {
-      // initialize list of participants 
-      participants_head = malloc(sizeof(ParticipantsHead));
-      TAILQ_INIT(participants_head);
 
       printf("Succeeded, current users:\n");
 
@@ -367,13 +303,16 @@ int join_chat(char *addr_port) {
  * @param join_leave_message [description]
  */
 void generate_participant_update(char* command_buff, int buff_len, char* join_leave_message) {
+  Participant* leader = get_leader();
+
   // TODO: handle buffer overflow
   command_buff += snprintf(command_buff, buff_len, "PARTICIPANT_UPDATE @%s:%s:%s ",
     leader->nickname, leader->ip_address, leader->port_num);
 
   Participant *curr_p;
 
-  TAILQ_FOREACH(curr_p, participants_head, participants) {
+  // TODO: fix traversal
+  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
     if (!curr_p->is_leader) {
       command_buff += snprintf(command_buff, buff_len, "%s:%s:%s ",
         curr_p->nickname, curr_p->ip_address, curr_p->port_num);
@@ -397,13 +336,11 @@ void broadcast_message(char* message) {
   char update_buff[MAX_BUFFER_LEN];
   int update_buff_pos = 0;
 
-  TAILQ_FOREACH(curr_p, participants_head, participants) {
+  // TODO: fix iteration
+  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
     if (prev_p && remove_next) {
       // free previous
-      free(prev_p->nickname);
-      free(prev_p->ip_address);
-      free(prev_p->port_num);
-      free(prev_p);
+      free_participant(prev_p);
     }
 
     remove_next = 0;
@@ -421,18 +358,15 @@ void broadcast_message(char* message) {
         update_buff_pos += snprintf(update_buff + update_buff_pos, MAX_BUFFER_LEN - update_buff_pos,
           "%s, ", curr_p->nickname);
         // logically delete
-        TAILQ_REMOVE(participants_head, curr_p, participants);
-        // mark for deletion node
+        TAILQ_REMOVE(get_participants_head(), curr_p, participants);
+        // mark for deletion next
         remove_next = 1;
       }
     }
   }
 
   if (prev_p && remove_next) {
-    free(prev_p->nickname);
-    free(prev_p->ip_address);
-    free(prev_p->port_num);
-    free(prev_p);
+    free_participant(prev_p);
   }
 
   if (need_update) {
@@ -472,9 +406,11 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
     char join_message[MAX_BUFFER_LEN];
     snprintf(join_message, sizeof(join_message), "NOTICE %s joined on %s:%s",
       rest_command, ip_address, port_num);
+
     char participant_update[MAX_BUFFER_LEN];
     generate_participant_update(participant_update, sizeof(participant_update),
       join_message);
+
     broadcast_message(participant_update);
     printf("%s\n", join_message);
   } else if (!strcmp("MESSAGE_REQUEST", command_type)) {
@@ -493,12 +429,14 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
     broadcast_message(message_broadcast);
 
     printf("%s:: %s\n", sender_nickname, payload);
+  } else if (!strcmp("HEARTBEAT", command_type)) {
+    // ignore, don't have to do anything on receiving end
   } else {
     printf("Unrecognized command: %s\n", buf);
   }
 }
 
-void non_leader_receive_message (char* buf) {
+void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
   // case match for message type
   char message_type[20];
   char rest_message[MAX_BUFFER_LEN + 1];
@@ -527,16 +465,18 @@ void non_leader_receive_message (char* buf) {
     // receive add me
     // process message request
     char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
+
+    Participant* leader = get_leader();
+
     snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s:%s", leader->ip_address, leader->port_num);
-    
-    rmp_address leader_addr;
-    RMP_getAddressFor(leader->ip_address, leader->port_num, &leader_addr);
 
     // send message request
-    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
+    if (RMP_sendTo(socket_fd, recv_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
       printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
       exit(1);
     }
+  } else if (!strcmp("HEARTBEAT", message_type)) {
+    // ignore, don't have to do anything on receiving end
   } else {
     // invalid message
     printf("chat_non_leader, invalid message received: %s\n", buf);
@@ -544,8 +484,62 @@ void non_leader_receive_message (char* buf) {
   }
 }
 
+void get_leader_addr(rmp_address* leader_addr) {
+  Participant* leader = get_leader();
+
+  // get rmp_address of leader
+  RMP_getAddressFor(leader->ip_address, leader->port_num, leader_addr);
+}
+
+void recv_stdin(char* buf, int num_bytes) {
+  if (get_is_leader()) {
+    // send out message directly
+    char message_broadcast[MAX_BUFFER_LEN];
+
+    snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
+      clock_num++, this_nickname, buf);
+
+    broadcast_message(message_broadcast);
+
+    printf("%s:: %s\n", this_nickname, buf);
+  } else {
+    // send message request
+    char message_request_buf[MAX_BUFFER_LEN];
+
+    snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", this_nickname, buf);
+
+    rmp_address leader_addr;
+
+    get_leader_addr(&leader_addr);
+
+    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) == -1) {
+      perror("recv_stdin non-leader\n");
+      exit(1);
+    }
+  }
+}
+
+void send_heartbeat() {
+  char* heartbeat = "HEARTBEAT";
+
+  if (get_is_leader()) {
+    // send to everyone
+    broadcast_message(heartbeat);
+  } else {
+    // send only to leader
+    rmp_address leader_addr;
+
+    get_leader_addr(&leader_addr);
+
+    if (RMP_sendTo(socket_fd, &leader_addr, heartbeat, strlen(heartbeat) + 1) == -1) {
+      perror("recv_stdin non-leader\n");
+      exit(1);
+    }
+  }
+}
+
 // chat
-int chat() {
+void chat() {
   // set up select
   fd_set all_fds, read_fds;
 
@@ -556,12 +550,14 @@ int chat() {
   FD_SET(socket_fd, &all_fds);
   FD_SET(STDIN_FILENO, &all_fds);
   
+  struct timeval until_next_heartbeat = HEARTBEAT_INTERVAL;
+
   while (1) {
     // update read_fds to all_fds
     read_fds = all_fds;
 
     // select for non-blocking I/O
-    if ((select(socket_fd + 1, &read_fds, NULL, NULL, NULL)) == -1) {
+    if ((select(socket_fd + 1, &read_fds, NULL, NULL, &until_next_heartbeat)) == -1) {
       perror("chat_leader: select");
       exit(1);
     }
@@ -575,36 +571,7 @@ int chat() {
       if (num_bytes > 1) {
         buf[num_bytes - 1] = '\0';
 
-        if (is_leader) {
-          // send out message directly
-          char message_broadcast[MAX_BUFFER_LEN];
-
-          snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
-            clock_num++, this_nickname, buf);
-
-          broadcast_message(message_broadcast);
-
-          printf("%s:: %s\n", this_nickname, buf);
-        } else {
-          // send message request
-          char message_request_buf[MAX_BUFFER_LEN];
-
-          snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", this_nickname, buf);
-
-          rmp_address leader_addr;
-
-          // get rmp_address of leader
-          if (RMP_getAddressFor(leader->ip_address, leader->port_num, &leader_addr) == -1) {
-            printf("%s ; %s\n", leader->ip_address, leader->port_num);
-            printf("chat: RMP_getAddressFor\n");
-            exit(1);
-          }
-          if ((num_bytes = RMP_sendTo(socket_fd, &leader_addr, message_request_buf,
-              strlen(message_request_buf) + 1)) == -1) {
-            printf("chat: RMP_sendTo\n");
-            exit(1);
-          }
-        }
+        recv_stdin(buf, num_bytes);
       } else if (num_bytes == 0) {
         // CTRL+D was pressed
         break;
@@ -625,30 +592,30 @@ int chat() {
 
       buf[num_bytes - 1] = '\0';
 
-      if (is_leader) {
+      if (get_is_leader()) {
         leader_receive_message(buf, &recv_addr);
       } else {
-        non_leader_receive_message(buf);
+        non_leader_receive_message(buf, &recv_addr);
       }
     }
+    if (until_next_heartbeat.tv_sec == 0 && until_next_heartbeat.tv_usec == 0) {
+      // heartbeat
+      send_heartbeat();
+
+      // reset for next heartbeat
+      until_next_heartbeat = HEARTBEAT_INTERVAL;
+    }
   }
-  
-  return 0;
 }
 
 // leave chat (free all relevant data structures)
-int exit_chat() {
+void exit_chat() {
   // empty list of participants
   empty_list();
-  
-  // free list of participants
-  free(participants_head);
   
   RMP_closeSocket(socket_fd);
   
   printf("\nYou left the chat.\n");
-  
-  return 0;
 }
 
 // run dchat
@@ -676,9 +643,8 @@ int main(int argc, char** argv) {
   // start a new chat group as the leader
   if (argc == 2) {
     start_chat();
-  }
-  // join an existing chat group
-  else {
+  } else {
+    // join an existing chat group
     join_chat(argv[2]);
   }
   
