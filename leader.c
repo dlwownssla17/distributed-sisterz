@@ -21,7 +21,18 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
   }
 
   if (!strcmp(MESSAGE_ADD_ME, command_type)) {
-    // TODO: check for duplicate nicknames
+    // check for duplicate names
+    if (contains_participant(rest_command)) {
+      char *join_nickname_failure = "JOIN_NICKNAME_FAILURE";
+
+      // send join nickname failure
+      if (RMP_sendTo(get_socket_fd(), recv_addr, join_nickname_failure, strlen(join_nickname_failure) + 1) < 0) {
+        printf("chat_leader: RMP_sendTo for JOIN_NICKNAME_FAILURE\n");
+        exit(1);
+      }
+
+      return;
+    }
 
     // create new participant
     char port_num[6];
