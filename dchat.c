@@ -30,6 +30,8 @@ int socket_fd;
 
 const struct timespec JOIN_ATTEMPT_WAIT_TIME = {.tv_sec = 0, .tv_nsec = 5e8};
 
+const struct timeval HEARTBEAT_INTERVAL = {.tv_sec = 3, .tv_usec = 0};
+
 /* functions */
 
 /**
@@ -404,9 +406,11 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
     char join_message[MAX_BUFFER_LEN];
     snprintf(join_message, sizeof(join_message), "NOTICE %s joined on %s:%s",
       rest_command, ip_address, port_num);
+
     char participant_update[MAX_BUFFER_LEN];
     generate_participant_update(participant_update, sizeof(participant_update),
       join_message);
+
     broadcast_message(participant_update);
     printf("%s\n", join_message);
   } else if (!strcmp("MESSAGE_REQUEST", command_type)) {
@@ -425,12 +429,14 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
     broadcast_message(message_broadcast);
 
     printf("%s:: %s\n", sender_nickname, payload);
+  } else if (!strcmp("HEARTBEAT", command_type)) {
+    // ignore, don't have to do anything on receiving end
   } else {
     printf("Unrecognized command: %s\n", buf);
   }
 }
 
-void non_leader_receive_message (char* buf) {
+void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
   // case match for message type
   char message_type[20];
   char rest_message[MAX_BUFFER_LEN + 1];
@@ -463,15 +469,14 @@ void non_leader_receive_message (char* buf) {
     Participant* leader = get_leader();
 
     snprintf(message_request_buf, sizeof(message_request_buf), "LEADER_ID %s:%s", leader->ip_address, leader->port_num);
-    
-    rmp_address leader_addr;
-    RMP_getAddressFor(leader->ip_address, leader->port_num, &leader_addr);
 
     // send message request
-    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
+    if (RMP_sendTo(socket_fd, recv_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
       printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
       exit(1);
     }
+  } else if (!strcmp("HEARTBEAT", message_type)) {
+    // ignore, don't have to do anything on receiving end
   } else {
     // invalid message
     printf("chat_non_leader, invalid message received: %s\n", buf);
@@ -479,8 +484,62 @@ void non_leader_receive_message (char* buf) {
   }
 }
 
+void get_leader_addr(rmp_address* leader_addr) {
+  Participant* leader = get_leader();
+
+  // get rmp_address of leader
+  RMP_getAddressFor(leader->ip_address, leader->port_num, leader_addr);
+}
+
+void recv_stdin(char* buf, int num_bytes) {
+  if (get_is_leader()) {
+    // send out message directly
+    char message_broadcast[MAX_BUFFER_LEN];
+
+    snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
+      clock_num++, this_nickname, buf);
+
+    broadcast_message(message_broadcast);
+
+    printf("%s:: %s\n", this_nickname, buf);
+  } else {
+    // send message request
+    char message_request_buf[MAX_BUFFER_LEN];
+
+    snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", this_nickname, buf);
+
+    rmp_address leader_addr;
+
+    get_leader_addr(&leader_addr);
+
+    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) == -1) {
+      perror("recv_stdin non-leader\n");
+      exit(1);
+    }
+  }
+}
+
+void send_heartbeat() {
+  char* heartbeat = "HEARTBEAT";
+
+  if (get_is_leader()) {
+    // send to everyone
+    broadcast_message(heartbeat);
+  } else {
+    // send only to leader
+    rmp_address leader_addr;
+
+    get_leader_addr(&leader_addr);
+
+    if (RMP_sendTo(socket_fd, &leader_addr, heartbeat, strlen(heartbeat) + 1) == -1) {
+      perror("recv_stdin non-leader\n");
+      exit(1);
+    }
+  }
+}
+
 // chat
-int chat() {
+void chat() {
   // set up select
   fd_set all_fds, read_fds;
 
@@ -491,12 +550,14 @@ int chat() {
   FD_SET(socket_fd, &all_fds);
   FD_SET(STDIN_FILENO, &all_fds);
   
+  struct timeval until_next_heartbeat = HEARTBEAT_INTERVAL;
+
   while (1) {
     // update read_fds to all_fds
     read_fds = all_fds;
 
     // select for non-blocking I/O
-    if ((select(socket_fd + 1, &read_fds, NULL, NULL, NULL)) == -1) {
+    if ((select(socket_fd + 1, &read_fds, NULL, NULL, &until_next_heartbeat)) == -1) {
       perror("chat_leader: select");
       exit(1);
     }
@@ -510,35 +571,7 @@ int chat() {
       if (num_bytes > 1) {
         buf[num_bytes - 1] = '\0';
 
-        if (get_is_leader()) {
-          // send out message directly
-          char message_broadcast[MAX_BUFFER_LEN];
-
-          snprintf(message_broadcast, sizeof(message_broadcast), "MESSAGE_BROADCAST %d %s= %s",
-            clock_num++, this_nickname, buf);
-
-          broadcast_message(message_broadcast);
-
-          printf("%s:: %s\n", this_nickname, buf);
-        } else {
-          // send message request
-          char message_request_buf[MAX_BUFFER_LEN];
-
-          snprintf(message_request_buf, sizeof(message_request_buf), "MESSAGE_REQUEST %s= %s", this_nickname, buf);
-
-          Participant* leader = get_leader();
-
-          rmp_address leader_addr;
-
-          // get rmp_address of leader
-          RMP_getAddressFor(leader->ip_address, leader->port_num, &leader_addr);
-
-          if ((num_bytes = RMP_sendTo(socket_fd, &leader_addr, message_request_buf,
-              strlen(message_request_buf) + 1)) == -1) {
-            printf("chat: RMP_sendTo\n");
-            exit(1);
-          }
-        }
+        recv_stdin(buf, num_bytes);
       } else if (num_bytes == 0) {
         // CTRL+D was pressed
         break;
@@ -562,24 +595,27 @@ int chat() {
       if (get_is_leader()) {
         leader_receive_message(buf, &recv_addr);
       } else {
-        non_leader_receive_message(buf);
+        non_leader_receive_message(buf, &recv_addr);
       }
     }
+    if (until_next_heartbeat.tv_sec == 0 && until_next_heartbeat.tv_usec == 0) {
+      // heartbeat
+      send_heartbeat();
+
+      // reset for next heartbeat
+      until_next_heartbeat = HEARTBEAT_INTERVAL;
+    }
   }
-  
-  return 0;
 }
 
 // leave chat (free all relevant data structures)
-int exit_chat() {
+void exit_chat() {
   // empty list of participants
   empty_list();
   
   RMP_closeSocket(socket_fd);
   
   printf("\nYou left the chat.\n");
-  
-  return 0;
 }
 
 // run dchat
@@ -607,9 +643,8 @@ int main(int argc, char** argv) {
   // start a new chat group as the leader
   if (argc == 2) {
     start_chat();
-  }
-  // join an existing chat group
-  else {
+  } else {
+    // join an existing chat group
     join_chat(argv[2]);
   }
   
