@@ -94,3 +94,35 @@ void free_participant(Participant* p) {
   free(p->port_num);
   free(p);
 }
+
+/* sets the leader to be the node with matching ip address and port number
+ * Must also set other is_leader's to false
+ */
+void set_leader_by_addr(char* ip_address, char* port_num) {
+  Participant *curr_p;
+
+  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
+    if (!strcmp(ip_address, curr_p->ip_address) && !strcmp(port_num, curr_p->port_num)) {
+      leader = curr_p;
+      curr_p->is_leader = 1;
+    } else {
+      curr_p->is_leader = 0;
+    }
+  }
+}
+
+/* sets the leader to be the node with matching nickname
+ * Must also set other is_leader's to false
+ */
+void set_leader_by_nickname(char* nickname) {
+  Participant *curr_p;
+
+  TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
+    if (!strcmp(nickname, curr_p->nickname)) {
+      leader = curr_p;
+      curr_p->is_leader = 1;
+    } else {
+      curr_p->is_leader = 0;
+    }
+  }
+}

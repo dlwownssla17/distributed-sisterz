@@ -111,27 +111,33 @@ void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
   } else if (!strcmp(MESSAGE_PARTICIPANT_UPDATE, message_type)) {
     // receive participant update
     process_participant_update(buf, 0);
-  } else if (!strcmp(MESSAGE_START_ELECTION, message_type)) {
-    // receive start election
-    // TODO: elections
   } else if (!strcmp(MESSAGE_ADD_ME, message_type)) {
-    // receive add me
-    // process message request
-    char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
+    if (is_in_election()) {
+      // send failure during election
+      RMP_sendTo(get_socket_fd(), recv_addr, MESSAGE_JOIN_FAILURE, strlen(MESSAGE_JOIN_FAILURE) + 1);
+    } else {
+      // receive add me
+      // process message request
+      char message_request_buf[10 + MAX_IP_ADDRESS_LEN + 1 + MAX_PORT_NUM_LEN + 1];
 
-    Participant* leader = get_leader();
+      Participant* leader = get_leader();
 
-    snprintf(message_request_buf, sizeof(message_request_buf), "%s %s:%s", MESSAGE_LEADER_ID, leader->ip_address, leader->port_num);
+      snprintf(message_request_buf, sizeof(message_request_buf), "%s %s:%s", MESSAGE_LEADER_ID, leader->ip_address, leader->port_num);
 
-    // send message request
-    if (RMP_sendTo(get_socket_fd(), recv_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
-      printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
-      exit(1);
+      // send message request
+      if (RMP_sendTo(get_socket_fd(), recv_addr, message_request_buf, strlen(message_request_buf) + 1) < 0) {
+        printf("chat_non_leader: RMP_sendTo for ADD_ME\n");
+        exit(1);
+      }
     }
   } else if (!strcmp(MESSAGE_HEARTBEAT, message_type)) {
     // ignore, don't have to do anything on receiving end
-  }  else if(!strcmp(MESSAGE_START_ELECTION, message_type)) {
+  } else if (!strcmp(MESSAGE_START_ELECTION, message_type)) {
     respond_to_leader_election(recv_addr);
+  } else if (!strcmp(MESSAGE_STOP_ELECTION, message_type)) {
+    stop_election();
+  } else if (!strcmp(MESSAGE_ELECTION_VICTORY, message_type)) {
+    set_new_leader(recv_addr);
   } else {
     // invalid message
     printf("chat_non_leader, invalid message received: %s\n", buf);
@@ -147,7 +153,6 @@ void nonleader_broadcast_message(char* message) {
 
   int message_len = strlen(message);
 
-  // TODO: fix iteration
   TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
 
     if(strcmp(get_own_nickname(), curr_p->nickname) == 0) {

@@ -29,6 +29,16 @@ void model_init();
 
 int get_is_leader();
 
+/* sets the leader to be the node with matching ip address and port number
+ * Must also set other is_leader's to false
+ */
+void set_leader_by_addr(char* ip_address, char* port_num);
+
+/* sets the leader to be the node with matching nickname
+ * Must also set other is_leader's to false
+ */
+void set_leader_by_nickname(char* nickname);
+
 void set_is_leader(int i_is_leader);
 
 Participant* get_leader();
