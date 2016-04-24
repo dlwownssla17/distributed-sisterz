@@ -186,6 +186,9 @@ int join_chat(char *addr_port) {
 
       process_participant_update(recv_buff, 1);
       return 1;
+    } else if (!strcmp("JOIN_NICKNAME_FAILURE", command_type)) {
+      printf("Participant with nickname '%s' already exists.\n", this_nickname);
+      exit(1);
     } else if (!strcmp("JOIN_FAILURE", command_type)) {
       // wait 500ms and retry
       IF_DEBUG(printf("Join attempt #%d failed\n", failed_join_attempts + 1));
@@ -232,7 +235,6 @@ void broadcast_message(char* message) {
   char update_buff[MAX_BUFFER_LEN];
   int update_buff_pos = 0;
 
-  // TODO: fix iteration
   TAILQ_FOREACH(curr_p, get_participants_head(), participants) {
     if (prev_p && remove_next) {
       // free previous
