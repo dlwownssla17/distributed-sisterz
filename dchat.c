@@ -512,7 +512,8 @@ void recv_stdin(char* buf, int num_bytes) {
 
     get_leader_addr(&leader_addr);
 
-    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) == -1) {
+    if (RMP_sendTo(socket_fd, &leader_addr, message_request_buf, strlen(message_request_buf) + 1) < 1) {
+      // TODO: initiate leader election?
       perror("recv_stdin non-leader\n");
       exit(1);
     }
@@ -531,8 +532,9 @@ void send_heartbeat() {
 
     get_leader_addr(&leader_addr);
 
-    if (RMP_sendTo(socket_fd, &leader_addr, heartbeat, strlen(heartbeat) + 1) == -1) {
-      perror("recv_stdin non-leader\n");
+    if (RMP_sendTo(socket_fd, &leader_addr, heartbeat, strlen(heartbeat) + 1) < 0) {
+      // TODO: initiate leader election
+      perror("heartbeat non-leader");
       exit(1);
     }
   }
@@ -586,7 +588,7 @@ void chat() {
       rmp_address recv_addr;
 
       if ((num_bytes = RMP_listen(socket_fd, buf, MAX_BUFFER_LEN, &recv_addr)) == -1) {
-        printf("chat_leader: RMP_listen\n");
+        perror("chat_leader: RMP_listen");
         exit(1);
       }
 
