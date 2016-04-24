@@ -36,7 +36,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 			return null;
 		}
 		String participant = sortedParticipants.get(index);
-		return participant + (leader.equals(participant) ? " (leader)" : "");
+		return participant + (leader != null && leader.equals(participant) ? " (leader)" : "");
 	}
 
 	@Override
@@ -75,7 +75,7 @@ public class ParticipantListModel extends AbstractListModel<String> {
 	public synchronized void removeParticipant(String participant) {
 		if (participants.contains(participant)) {
 			if (participant.equals(leader)) {
-				throw new IllegalArgumentException("Cannot remove leader");
+				leader = null;
 			}
 			participants.remove(participant);
 			sortedParticipants.remove(participant);
@@ -85,9 +85,11 @@ public class ParticipantListModel extends AbstractListModel<String> {
 	
 	public synchronized void setLeader(String newLeader) {
 		if (participants.contains(newLeader)) {
+			int oldleaderIndex = sortedParticipants.indexOf(leader);
 			leader = newLeader;
 			int leaderIndex = sortedParticipants.indexOf(newLeader);
 			fireContentsChanged(this, leaderIndex, leaderIndex);
+			fireContentsChanged(this, oldleaderIndex, oldleaderIndex);
 		} else {
 			throw new IllegalArgumentException("Leader not in model");
 		}

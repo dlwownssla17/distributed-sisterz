@@ -52,8 +52,8 @@ public class ChatRunner {
 		javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 createAndShowGUI();
-                //source = new MockSource(ChatRunner.this, sourcePointer);
-                source = new DChatSource(ChatRunner.this, sourcePointer, nickname, hintAddress);
+                source = new MockSource(ChatRunner.this, sourcePointer);
+                //source = new DChatSource(ChatRunner.this, sourcePointer, nickname, hintAddress);
                 source.run();
             }
         });
@@ -222,5 +222,9 @@ public class ChatRunner {
 	public void initAsLeader(String nickname) {
 		participantsModel.addParticipant(nickname);
 		participantsModel.setLeader(nickname);
+	}
+
+	public void setLeader(String newLeader) {
+		participantsModel.setLeader(newLeader);
 	}
 }

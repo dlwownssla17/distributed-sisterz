@@ -74,6 +74,9 @@ public abstract class ChatSource {
 			} else if (lineParts.length == 5 && lineParts[2].equals("joined") && lineParts[3].equals("on")) {
 				// Joined chat
 				view.addParticipant(lineParts[1]);
+			} else if (lineParts.length == 6 && line.endsWith(" is the new leader")) {
+				// Left chat
+				view.setLeader(lineParts[1]);
 			} else {
 				// unknown notice
 				System.err.println("Unknown notice: " + line);

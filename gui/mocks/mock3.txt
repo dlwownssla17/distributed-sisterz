@@ -1,0 +1,10 @@
+matth joining a new chat on 158.130.24.205:39333, listening on 158.130.24.208:37148
+Succeeded, current users:
+foozie 158.130.24.205:39333 (Leader)
+matth 158.130.24.208:37148
+
+hey
+matth:: hey
+NOTICE foozie left the chat or crashed
+NOTICE matth is the new leader
+Waiting for others to join...
