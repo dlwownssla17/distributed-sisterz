@@ -16,6 +16,8 @@ public class ParticipantListModel extends AbstractListModel<String> {
 	private List<String> sortedParticipants;
 	
 	private String leader;
+
+	private String ownNickname;
 	
 	public ParticipantListModel(Collection<String> initialParticipants, String leader) {
 		participants = new HashSet<>(initialParticipants);
@@ -30,13 +32,18 @@ public class ParticipantListModel extends AbstractListModel<String> {
 		Collections.sort(sortedParticipants);
 	}
 	
+	public void setOwnNickname(String ownNickname) {
+		this.ownNickname = ownNickname;
+	}
+
 	@Override
 	public synchronized String getElementAt(int index) {
 		if (index >= sortedParticipants.size()) {
 			return null;
 		}
 		String participant = sortedParticipants.get(index);
-		return participant + (leader != null && leader.equals(participant) ? " (leader)" : "");
+		return participant + (leader != null && leader.equals(participant) ? " (leader)" : "")
+			+ (ownNickname.equals(participant) ? " (me)" : "");
 	}
 
 	@Override

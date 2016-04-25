@@ -24,9 +24,10 @@ import javax.swing.text.StyleConstants;
 
 public class ChatRunner {
 	
-    private ParticipantListModel participantsModel;
+  private ParticipantListModel participantsModel;
 	private SimpleAttributeSet noticeStyle;
 	private SimpleAttributeSet nicknameStyle;
+  private SimpleAttributeSet ownStyle;
 	private Document chatDoc;
 	private JTextField chatEntry;
 	private ChatSource source;
@@ -52,8 +53,9 @@ public class ChatRunner {
 		javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 createAndShowGUI();
-                source = new MockSource(ChatRunner.this, sourcePointer);
-                //source = new DChatSource(ChatRunner.this, sourcePointer, nickname, hintAddress);
+                participantsModel.setOwnNickname(nickname);
+                //source = new MockSource(ChatRunner.this, sourcePointer);
+                source = new DChatSource(ChatRunner.this, sourcePointer, nickname, hintAddress);
                 source.run();
             }
         });
@@ -106,6 +108,11 @@ public class ChatRunner {
         nicknameStyle = new SimpleAttributeSet();
         StyleConstants.setForeground(nicknameStyle, Color.BLUE);
         StyleConstants.setBold(nicknameStyle, true);
+
+        // create style for message nickname
+        ownStyle = new SimpleAttributeSet();
+        StyleConstants.setForeground(ownStyle, Color.RED);
+        StyleConstants.setBold(ownStyle, true);
     }
 	
 	private void addComponentsToPane(Container pane) {
@@ -165,7 +172,8 @@ public class ChatRunner {
 	
 	public void displayMessage(String sender, String message) {
 		try {
-			chatDoc.insertString(chatDoc.getLength(), sender + ": ", nicknameStyle);
+			chatDoc.insertString(chatDoc.getLength(), sender + ": ",
+        sender.equals(nickname) ? ownStyle : nicknameStyle);
 			chatDoc.insertString(chatDoc.getLength(), message + "\n", null);
 		} catch (BadLocationException e) {
 			e.printStackTrace();
