@@ -4,13 +4,13 @@ OBJS = *.o
 EXEC = dchat
 CFLAGS = -g -Wall
 CC = clang
-DEPS = dchat.h RMP/rmp.h model.h leader.h nonleader.h
+DEPS = dchat.h RMP/rmp.h model.h leader.h nonleader.h encryption/encryption.h
 
 me_a_sandwich : dchat
 
 # dchat program
 
-dchat : dchat.o model.o RMP/librmp.a leader.o nonleader.o
+dchat : dchat.o model.o RMP/librmp.a leader.o nonleader.o encryption/encryption.o
 	$(CC) -o $@ $^
 
 dchat.o : dchat.c $(DEPS)
@@ -28,6 +28,9 @@ nonleader.o : nonleader.c $(DEPS)
 RMP/librmp.a : 
 	cd RMP && make
 
+encryption/encryption.o:
+	cd encryption && make
+
 # generic commands
 
 %.o : %.c $(DEPS)
@@ -41,6 +44,7 @@ RMP/librmp.a :
 clean :
 	rm -rf $(EXEC) $(OBJS)
 	cd RMP && make clean
+	cd encryption && make clean
 
 # check for todos
 todo:

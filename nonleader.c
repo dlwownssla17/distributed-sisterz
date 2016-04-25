@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include "dchat.h"
+#include "encryption/encryption.h"
 #include "model.h"
 #include "RMP/rmp.h"
 #include "nonleader.h"
@@ -107,7 +108,10 @@ void non_leader_receive_message (char* buf, rmp_address* recv_addr) {
       exit(1);
     }
     set_clock(message_id);
-    printf("%s:: %s\n", sender_nickname, message_payload);
+
+    char plaintext_buffer[MAX_BUFFER_LEN];
+    decrypt(message_payload, strlen(message_payload), ENCRYPTION_KEY, plaintext_buffer, MAX_BUFFER_LEN);
+    printf("%s:: %s\n", sender_nickname, plaintext_buffer);
   } else if (!strcmp(MESSAGE_PARTICIPANT_UPDATE, message_type)) {
     // receive participant update
     process_participant_update(buf, 0);
