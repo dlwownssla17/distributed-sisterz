@@ -78,8 +78,10 @@ void get_ip_address(char* ip_address) {
   }
 }
 
-// start a new chat group as the leader
-int start_chat() {
+/**
+ * Start a new chat group as the leader. This function is only called by main()
+ */
+void start_chat() {
   char ip_address[MAX_IP_ADDRESS_LEN + 1];
   char port_num[MAX_PORT_NUM_LEN + 1];
 
@@ -111,14 +113,15 @@ int start_chat() {
   printf("%s started a new chat, listening on %s:%s\n", this_nickname, ip_address, port_num);
 
   printf("Waiting for others to join...\n");
-  
-  return 0;
 }
 
-// join an existing chat group
-int join_chat(char *addr_port) {
+/**
+ * join an existing chat group
+ * @param addr_port The address of the leader_hint, in the form "0.0.0.0:0"
+ */
+void join_chat(char *addr_port) {
   int failed_join_attempts;
-  rmp_address this_addr, suspected_leader, recv_addr;
+  rmp_address this_addr, leader_hint, recv_addr;
   char recv_buff[MAX_BUFFER_LEN];
   char ip_address[MAX_IP_ADDRESS_LEN + 1];
   char port_num[MAX_PORT_NUM_LEN + 1];
@@ -148,7 +151,7 @@ int join_chat(char *addr_port) {
   printf("%s joining a new chat on %s, listening on %s:%s\n", this_nickname, addr_port,
     ip_address, port_num);
 
-  // set up suspected_leader, i.e. hint address to use to try to join chat
+  // set up leader_hint, i.e. hint address to use to try to join chat
   // split addr_port into addr and port
   char addr[MAX_IP_ADDRESS_LEN + 1];
 
@@ -165,7 +168,7 @@ int join_chat(char *addr_port) {
   char port[6];
   strncpy(port, addr_port + colon_pos + 1, sizeof(port));
 
-  if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
+  if (RMP_getAddressFor(addr, port, &leader_hint) < 0) {
     fprintf(stderr, "RMP_getAddressFor 2 error\n");
     exit(1);
   }
@@ -177,7 +180,7 @@ int join_chat(char *addr_port) {
   // try to join
   for (failed_join_attempts = 0; failed_join_attempts < 10; failed_join_attempts++) {
     // send ADD_ME
-    if (RMP_sendTo(socket_fd, &suspected_leader, add_me_cmd, strlen(add_me_cmd) + 1) < 0) {
+    if (RMP_sendTo(socket_fd, &leader_hint, add_me_cmd, strlen(add_me_cmd) + 1) < 0) {
       fprintf(stderr, "RMP_sendTo error\n");
       exit(1);
     }
@@ -190,7 +193,6 @@ int join_chat(char *addr_port) {
       exit(1);
     }
 
-    // TODO: check that recv_addr equals suspected_leader
     char command_type[20];
     if (sscanf(recv_buff, "%s ", command_type) == EOF) {
       // EOF or error
@@ -202,7 +204,7 @@ int join_chat(char *addr_port) {
       printf("Succeeded, current users:\n");
 
       process_participant_update(recv_buff, 1);
-      return 1;
+      return;
     } else if (!strcmp(MESSAGE_JOIN_NICKNAME_FAILURE, command_type)) {
       printf("Participant with nickname '%s' already exists.\n", this_nickname);
       exit(1);
@@ -221,7 +223,7 @@ int join_chat(char *addr_port) {
       }
 
       // set new leader
-      if (RMP_getAddressFor(addr, port, &suspected_leader) < 0) {
+      if (RMP_getAddressFor(addr, port, &leader_hint) < 0) {
         fprintf(stderr, "RMP_getAddressFor 3 error\n");
         exit(1);
       }
@@ -234,10 +236,12 @@ int join_chat(char *addr_port) {
   
   fprintf(stderr, "Sorry, no chat is active on %s, try again later.\nBye.\n", addr_port);
   exit(1);
-
-  return 0;
 }
 
+/**
+ * Gets the address of the leader
+ * @param leader_addr A pointer to an rmp_address struct in which to write the results
+ */
 void get_leader_addr(rmp_address* leader_addr) {
   Participant* leader = get_leader();
 
@@ -245,6 +249,11 @@ void get_leader_addr(rmp_address* leader_addr) {
   RMP_getAddressFor(leader->ip_address, leader->port_num, leader_addr);
 }
 
+/**
+ * Processes data from stdin, either as leader or not
+ * @param buf       A pointer to the byte buffer
+ * @param num_bytes The number of bytes written into the buffer
+ */
 void recv_stdin(char* buf, int num_bytes) {
   char ciphertext_buffer[MAX_BUFFER_LEN];
   encrypt(buf, num_bytes, ENCRYPTION_KEY, ciphertext_buffer, MAX_BUFFER_LEN);
@@ -279,7 +288,10 @@ void recv_stdin(char* buf, int num_bytes) {
   }
 }
 
-// Send out a START_ELECTION
+/**
+ * Initiate an election, with this node running as leader.
+ * Sends out a START_ELECTION message
+ */
 void start_election() {
   IF_DEBUG(printf("starting election\n"));
   nonleader_broadcast_message(MESSAGE_START_ELECTION);
@@ -288,7 +300,9 @@ void start_election() {
   clock_gettime(CLOCK_MONOTONIC, &last_election_start);
 }
 
-/* Receive a ELECTION_STOP message */
+/**
+ * Handle an ELECTION_STOP message
+ */
 void stop_election() {
   IF_DEBUG(printf("receive ELECTION_STOP\n"));
 
@@ -296,6 +310,13 @@ void stop_election() {
   started_election = 0;
 }
 
+/**
+ * Responds when this node receives a START_ELECTION. Either heeds to sender
+ * or sends an ELECTION_STOP message started by own ELECTION_START if outranks
+ * the START_ELECTION sends.
+ * 
+ * @param recv_addr The address that send the START_ELECTION message
+ */
 void respond_to_leader_election(rmp_address *recv_addr)
 {
   IF_DEBUG(printf("respond_to_leader_election\n"));
@@ -327,7 +348,11 @@ void respond_to_leader_election(rmp_address *recv_addr)
   }
 }
 
-/* After receiving ELECTION_VICTORY */
+/**
+ * Process an ELECTION_VICTORY by leaving election state and updating the current leader
+ * 
+ * @param recv_addr The address of the new leader
+ */
 void set_new_leader(rmp_address* recv_addr) {
   IF_DEBUG(printf("Setting new leader\n"));
   in_election = 0;
@@ -345,6 +370,10 @@ void set_new_leader(rmp_address* recv_addr) {
   set_is_leader(0);
 }
 
+/**
+ * Declare victory in an election. Sets self as leader and sends out ELECTION_VICTORY
+ * message. Finally, broadcasts a PARTICIPANT_UPDATE.
+ */
 void declare_victory() {
   IF_DEBUG(printf("Declaring victory\n"));
   in_election = 0;
@@ -368,6 +397,9 @@ void declare_victory() {
   }
 }
 
+/**
+ * Sends a heartbeat message and responds appropriately, whether leader or not
+ */
 void send_heartbeat() {
   char* heartbeat = MESSAGE_HEARTBEAT;
 
@@ -390,7 +422,11 @@ void send_heartbeat() {
   }
 }
 
-// chat
+/**
+ * This is the main chat event loop, triggered by SELECT events and times events
+ * (like heartbeats and election timeouts). The program only leaves this function
+ * upon EOF from input.
+ */
 void chat() {
   // set up select
   fd_set all_fds, read_fds;
@@ -485,7 +521,9 @@ void chat() {
   }
 }
 
-// leave chat (free all relevant data structures)
+/**
+ * Leaves the chat and destructs relevant memory
+ */
 void exit_chat() {
   // empty list of participants
   empty_list();
@@ -538,14 +576,27 @@ int main(int argc, char** argv) {
   return 0;
 }
 
+/**
+ * Returns the value of the local logical clock before incrementing it
+ * @return The clock value before incrementing
+ */
 int incr_clock() {
   return clock_num++;
 }
 
+/**
+ * Sets the local logical clock (when receiving a message from the leader)
+ * @param new_num The new clock value
+ */
 void set_clock(int new_num) {
   clock_num = new_num;
 }
 
+/**
+ * Gets the file descriptor of the rmp network socket
+ * Corresponds to a system UDP file descriptor.
+ * @return The fd number
+ */
 int get_socket_fd() {
   return socket_fd;
 }
