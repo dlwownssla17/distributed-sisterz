@@ -22,6 +22,7 @@
 #include "model.h"
 #include "RMP/rmp.h"
 #include "leader.h"
+#include "encryption/encryption.h"
 #include "nonleader.h"
 
 /* global variables */
@@ -245,12 +246,15 @@ void get_leader_addr(rmp_address* leader_addr) {
 }
 
 void recv_stdin(char* buf, int num_bytes) {
+  char ciphertext_buffer[MAX_BUFFER_LEN];
+  encrypt(buf, num_bytes, ENCRYPTION_KEY, ciphertext_buffer, MAX_BUFFER_LEN);
+
   if (get_is_leader()) {
     // send out message directly
     char message_broadcast[MAX_BUFFER_LEN];
 
     snprintf(message_broadcast, sizeof(message_broadcast), "%s %d %s= %s",
-      MESSAGE_BROADCAST, clock_num++, this_nickname, buf);
+      MESSAGE_BROADCAST, clock_num++, this_nickname, ciphertext_buffer);
 
     leader_broadcast_message(message_broadcast);
 
@@ -259,7 +263,7 @@ void recv_stdin(char* buf, int num_bytes) {
     // send message request
     char message_request_buf[MAX_BUFFER_LEN];
 
-    snprintf(message_request_buf, sizeof(message_request_buf), "%s %s= %s", MESSAGE_REQUEST, this_nickname, buf);
+    snprintf(message_request_buf, sizeof(message_request_buf), "%s %s= %s", MESSAGE_REQUEST, this_nickname, ciphertext_buffer);
 
     rmp_address leader_addr;
 

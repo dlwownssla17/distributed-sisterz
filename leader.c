@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include "encryption/encryption.h"
 #include "dchat.h"
 #include "model.h"
 #include "RMP/rmp.h"
@@ -68,7 +69,9 @@ void leader_receive_message(char* buf, rmp_address* recv_addr) {
 
     leader_broadcast_message(message_broadcast);
 
-    printf("%s:: %s\n", sender_nickname, payload);
+    char plaintext_buffer[MAX_BUFFER_LEN];
+    decrypt(payload, strlen(payload), ENCRYPTION_KEY, plaintext_buffer, MAX_BUFFER_LEN);
+    printf("%s:: %s\n", sender_nickname, plaintext_buffer);
   } else if (!strcmp(MESSAGE_HEARTBEAT, command_type)) {
     // ignore, don't have to do anything on receiving end
   } else if(!strcmp(MESSAGE_START_ELECTION, command_type)) {

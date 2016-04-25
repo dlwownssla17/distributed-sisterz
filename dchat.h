@@ -34,6 +34,8 @@
 #define MESSAGE_ELECTION_VICTORY "ELECTION_VICTORY"
 #define MESSAGE_HEARTBEAT "HEARTBEAT"
 
+#define ENCRYPTION_KEY "swordfish"
+
 #ifdef DEBUG
 # define IF_DEBUG(x) x
 #else
